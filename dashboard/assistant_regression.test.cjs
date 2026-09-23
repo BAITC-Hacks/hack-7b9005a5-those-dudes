@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { test } = require('node:test');
 const source = fs.readFileSync(path.join(__dirname, 'dist/app.js'), 'utf8');
 const html = fs.readFileSync(path.join(__dirname, 'dist/index.html'), 'utf8');
-const functionSource = source.slice(source.indexOf('  function setupAi()'), source.indexOf('  setupNavigation();'));
+const functionSource = source.slice(source.indexOf('  function setupAi()'), source.indexOf('\n  renderHeader();', source.indexOf('  function setupAi()')));
 
 function harness() {
   const get = () => ({ value: '', handlers: {}, dataset: {}, focus() {}, addEventListener(name, fn) { this.handlers[name] = fn; } });

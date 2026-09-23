@@ -7,12 +7,13 @@
   <title>Новый анализ — Граф денег</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/upload.css">
+  <link rel="stylesheet" href="/workspace.css">
 </head>
 <body class="upload-page">
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-      <div><h1>Граф денег</h1><p>Локальная исследовательская панель</p></div>
+      <div><h1>Граф денег</h1><p>Рабочая область AML</p></div>
     </div>
     <div class="topbar-status"><span class="status-dot"></span><span>Данные обрабатываются локально</span></div>
   </header>
@@ -35,7 +36,7 @@
         <fieldset id="uploadFields" class="upload-fields">
           <legend class="visually-hidden">Три обязательные таблицы</legend>
           <label class="file-card" for="nodesFile">
-            <span class="file-number">01 / УЗЛЫ</span>
+            <span class="file-number">Узлы</span>
             <strong>nodes.parquet</strong>
             <span class="file-description">Идентификаторы, глубина обхода и seed-узлы</span>
             <input id="nodesFile" name="nodes" type="file" accept=".parquet" required aria-describedby="nodesSchema nodesSelection">
@@ -43,7 +44,7 @@
             <code id="nodesSchema">gid · depth · is_seed</code>
           </label>
           <label class="file-card" for="edgesFile">
-            <span class="file-number">02 / СВЯЗИ</span>
+            <span class="file-number">Связи</span>
             <strong>edges.parquet</strong>
             <span class="file-description">Направленные связи с суммой и числом переводов</span>
             <input id="edgesFile" name="edges" type="file" accept=".parquet" required aria-describedby="edgesSchema edgesSelection">
@@ -51,7 +52,7 @@
             <code id="edgesSchema">src · dst · sum_kzt · n_tx · depth</code>
           </label>
           <label class="file-card" for="transactionsFile">
-            <span class="file-number">03 / ПЕРЕВОДЫ</span>
+            <span class="file-number">Переводы</span>
             <strong>transactions.parquet</strong>
             <span class="file-description">Отдельные транзакции и даты их проведения</span>
             <input id="transactionsFile" name="transactions" type="file" accept=".parquet" required aria-describedby="transactionsSchema transactionsSelection">
@@ -78,7 +79,7 @@
 
     <section class="current-dataset panel" aria-labelledby="current-title">
       <div><p class="eyebrow">УЖЕ ЕСТЬ В ПРОЕКТЕ</p><h3 id="current-title">Открыть исходный набор</h3><p id="currentDatasetSummary">Проверяем готовность сохранённого анализа…</p></div>
-      <a id="openCurrent" class="button secondary hidden" href="/dashboard?run=default">Открыть готовую панель →</a>
+      <a id="openCurrent" class="button secondary hidden" href="/dashboard?run=default">Открыть готовый анализ</a>
     </section>
     <footer class="upload-footer"><p>Результат: <code>nodes_roles.csv</code>, <code>clusters.csv</code>, <code>top_nodes.csv</code></p><p>Роли — гипотезы для аналитика, не выводы о виновности. Загрузка и расчёт не вызывают внешние AI-сервисы.</p></footer>
   </main>

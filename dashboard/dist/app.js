@@ -15,26 +15,26 @@
   }
 
   const COLORS = {
-    depth: ["#ffb454", "#38e1c6", "#66a5ff", "#b28cff", "#ff6b75"],
+    depth: ["#ffe373", "#3cffcd", "#70d7ff", "#d7acff", "#ff91c4"],
     role: {
-      consolidator: "#ffb454",
-      transit: "#38e1c6",
-      distributor: "#66a5ff",
-      terminal: "#b28cff",
-      coordinator: "#ff6b75",
-      peripheral: "#718897",
-      unknown: "#718897"
+      consolidator: "#3cffcd",
+      transit: "#70d7ff",
+      distributor: "#ffe373",
+      terminal: "#ff91c4",
+      coordinator: "#d7acff",
+      peripheral: "#b9cfe5",
+      unknown: "#b9cfe5"
     },
-    cluster: ["#38e1c6", "#ffb454", "#66a5ff", "#b28cff", "#ff6b75", "#74d680", "#f28bd2", "#80d5ff", "#ffd866", "#a5e075", "#ff8f70", "#8aa7ff"]
+    cluster: ["#3cffcd", "#ffe373", "#70d7ff", "#d7acff", "#ff91c4", "#80ed99", "#ff93e0", "#86dcff", "#ffe875", "#bef264", "#ff9875", "#99b5ff"]
   };
 
   const ROLE_LABELS = {
-    consolidator: "Консолидатор",
+    consolidator: "Сборщик",
     transit: "Транзит",
     distributor: "Распределитель",
-    terminal: "Терминальный",
+    terminal: "Конечный получатель",
     coordinator: "Координатор",
-    peripheral: "Периферийный"
+    peripheral: "Без явной роли"
   };
 
   const nodeById = new Map(D.nodes.map(node => [node.gid, node]));
@@ -81,7 +81,7 @@
     return `<article class="metric-card${accent ? " accent" : ""}"><span class="metric-label">${escapeHtml(label)}</span><strong class="metric-value">${escapeHtml(value)}</strong>${note ? `<span class="metric-note">${escapeHtml(note)}</span>` : ""}</article>`;
   }
 
-  function scoreTrack(value, color = "#38e1c6") {
+  function scoreTrack(value, color = "#3cffcd") {
     const score = clamp(Number(value || 0), 0, 1);
     return `<div class="score-track"><span><i style="width:${(score * 100).toFixed(1)}%;background:${color}"></i></span><strong>${escapeHtml(fmtScore(value))}</strong></div>`;
   }
@@ -107,11 +107,31 @@
   }
 
   function setupNavigation() {
-    $$(".nav-item").forEach(button => button.addEventListener("click", () => {
-      $$(".nav-item").forEach(item => item.classList.toggle("active", item === button));
-      $$(".view").forEach(view => view.classList.toggle("active", view.id === `view-${button.dataset.view}`));
-      if (button.dataset.view === "network") network.resize();
-    }));
+    const buttons = $$(".nav-item");
+    const allowed = new Set(buttons.map(button => button.dataset.view));
+    const activate = (requested, push = false) => {
+      const name = allowed.has(requested) ? requested : "network";
+      buttons.forEach(button => {
+        const active = button.dataset.view === name;
+        button.classList.toggle("active", active);
+        if (active) button.setAttribute("aria-current", "page");
+        else button.removeAttribute("aria-current");
+      });
+      $$(".view").forEach(view => view.classList.toggle("active", view.id === `view-${name}`));
+      document.body.dataset.view = name;
+      const label = buttons.find(button => button.dataset.view === name).getAttribute("aria-label");
+      document.title = `${label} — Граф денег`;
+      if (push && window.location.hash !== `#${name}`) {
+        // A section change never drops the dataset selector in the query string.
+        window.history.pushState(null, "", `${window.location.pathname}${window.location.search}#${name}`);
+      }
+      if (name === "network") network.resize();
+    };
+    buttons.forEach(button => button.addEventListener("click", () => activate(button.dataset.view, true)));
+    const restore = () => activate(window.location.hash.slice(1));
+    window.addEventListener("popstate", restore);
+    window.addEventListener("hashchange", restore);
+    restore();
   }
 
   function renderHeader() {
@@ -171,7 +191,7 @@
       const index = rows.indexOf(row);
       return `<text x="${x(index)}" y="${height - 12}" text-anchor="middle">${dateLabel(row.date)}</text>`;
     }).join("");
-    container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img"><defs><linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38e1c6" stop-opacity=".3"/><stop offset="1" stop-color="#38e1c6" stop-opacity="0"/></linearGradient></defs>${grid}<path class="area-main" d="${area}"/><path class="line-main" d="${path}"/>${secondaryKey ? `<path class="line-secondary" d="${secondPath}"/>` : ""}<line class="axis-line" x1="${left}" x2="${left + innerW}" y1="${top + innerH}" y2="${top + innerH}"/>${labels}</svg>`;
+    container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img"><defs><linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3cffcd" stop-opacity=".3"/><stop offset="1" stop-color="#3cffcd" stop-opacity="0"/></linearGradient></defs>${grid}<path class="area-main" d="${area}"/><path class="line-main" d="${path}"/>${secondaryKey ? `<path class="line-secondary" d="${secondPath}"/>` : ""}<line class="axis-line" x1="${left}" x2="${left + innerW}" y1="${top + innerH}" y2="${top + innerH}"/>${labels}</svg>`;
   }
 
   function fmtCompact(value) {
@@ -225,7 +245,7 @@
     const x = value => left + Math.log1p(value) / maxX * innerW;
     const y = value => top + innerH - Math.log1p(value) / maxY * innerH;
     const grid = [0, .25, .5, .75, 1].map(step => `<line class="grid-line" x1="${left + step * innerW}" x2="${left + step * innerW}" y1="${top}" y2="${top + innerH}"/><line class="grid-line" x1="${left}" x2="${left + innerW}" y1="${top + step * innerH}" y2="${top + step * innerH}"/>`).join("");
-    const circles = nodes.map(node => `<circle class="scatter-point" data-gid="${node.gid}" cx="${x(node.in_deg).toFixed(1)}" cy="${y(node.out_deg).toFixed(1)}" r="${(2.4 + Math.min(3, Math.log1p(node.total_kzt) / 8)).toFixed(1)}" fill="${COLORS.depth[node.depth] || "#718897"}" fill-opacity=".66"><title>${node.gid} · in ${node.in_deg} / out ${node.out_deg}</title></circle>`).join("");
+    const circles = nodes.map(node => `<circle class="scatter-point" data-gid="${node.gid}" cx="${x(node.in_deg).toFixed(1)}" cy="${y(node.out_deg).toFixed(1)}" r="${(2.4 + Math.min(3, Math.log1p(node.total_kzt) / 8)).toFixed(1)}" fill="${COLORS.depth[node.depth] || "#b9cfe5"}" fill-opacity=".66"><title>${node.gid} · in ${node.in_deg} / out ${node.out_deg}</title></circle>`).join("");
     container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img">${grid}<line class="axis-line" x1="${left}" x2="${left + innerW}" y1="${top + innerH}" y2="${top + innerH}"/><line class="axis-line" x1="${left}" x2="${left}" y1="${top}" y2="${top + innerH}"/>${circles}<text x="${left + innerW / 2}" y="${height - 10}" text-anchor="middle">Число источников →</text><text x="15" y="${top + innerH / 2}" transform="rotate(-90 15 ${top + innerH / 2})" text-anchor="middle">Число получателей →</text></svg>`;
     $$(".scatter-point", container).forEach(point => {
       point.style.cursor = "pointer";
@@ -363,7 +383,7 @@
       { label: "#", value: "display_rank", format: fmtInt },
       { label: "gid", value: "gid", className: "gid-cell", format: shortGid },
       { label: "Роль", value: "role", format: roleLabel },
-      { label: "Приоритет", value: "priority_score", html: true, format: value => scoreTrack(value, "#ffb454") },
+      { label: "Приоритет", value: "priority_score", html: true, format: value => scoreTrack(value, "#ffe373") },
       { label: "Почему", value: row => row.why || row.evidence || "—" }
     ], { clickable: true, rowData: row => `data-gid="${row.gid}"`, maxRows: 20 }) : emptyInline("top_nodes.csv или priority_score пока не рассчитаны.");
 
@@ -438,7 +458,7 @@
     visibleNodes: [],
     visibleEdges: [],
     positions: new Map(),
-    filters: { component: "all", cluster: "all", depths: new Set([0, 1, 2, 3, 4]), minAmount: 0, seedOnly: false, censoredOnly: false, color: "depth", layout: "depth" },
+    filters: { component: "all", cluster: "all", depths: new Set([0, 1, 2, 3, 4]), minAmount: 0, seedOnly: false, censoredOnly: false, color: "role", layout: "depth" },
 
     setup() {
       this.canvas = $("#networkCanvas");
@@ -665,15 +685,15 @@
 
     nodeColor(node) {
       if (this.filters.color === "cluster") return COLORS.cluster[node.cluster_id % COLORS.cluster.length];
-      if (this.filters.color === "status") return node.is_seed ? COLORS.depth[0] : (node.truncated_by_depth ? COLORS.depth[4] : "#38e1c6");
+      if (this.filters.color === "status") return node.is_seed ? COLORS.depth[0] : (node.truncated_by_depth ? COLORS.depth[4] : "#3cffcd");
       if (this.filters.color === "role") return COLORS.role[node.role] || COLORS.role.unknown;
-      return COLORS.depth[Number(node.depth)] || "#718897";
+      return COLORS.depth[Number(node.depth)] || "#b9cfe5";
     },
 
     renderLegend() {
       let entries;
       if (this.filters.color === "cluster") entries = D.clusters.slice(0, 10).map(item => [`Кластер ${item.cluster_id}`, COLORS.cluster[item.cluster_id % COLORS.cluster.length]]);
-      else if (this.filters.color === "status") entries = [["Seed", COLORS.depth[0]], ["Depth-4", COLORS.depth[4]], ["Наблюдаемый", "#38e1c6"]];
+      else if (this.filters.color === "status") entries = [["Seed", COLORS.depth[0]], ["Depth-4", COLORS.depth[4]], ["Наблюдаемый", "#3cffcd"]];
       else if (this.filters.color === "role") entries = Object.entries(COLORS.role).filter(([key]) => key !== "unknown").map(([key, color]) => [roleLabel(key), color]);
       else entries = COLORS.depth.map((color, depth) => [`Depth ${depth}`, color]);
       $("#networkLegend").innerHTML = entries.map(([label, color]) => `<div class="legend-item"><span class="legend-dot" style="background:${color}"></span>${escapeHtml(label)}</div>`).join("");
@@ -685,7 +705,7 @@
       ctx.clearRect(0, 0, this.width, this.height);
       $("#networkZoom").textContent = `${Math.round(this.scale / this.fitScale * 100)}%`;
       if (!this.visibleNodes.length) {
-        ctx.fillStyle = "#8ea6b4";
+        ctx.fillStyle = "#dbe9f8";
         ctx.font = "14px system-ui";
         ctx.textAlign = "center";
         ctx.fillText("Нет узлов для выбранных фильтров", this.width / 2, this.height / 2);
@@ -703,11 +723,11 @@
         if (!a || !b) continue;
         if ((a.x < -20 && b.x < -20) || (a.y < -20 && b.y < -20) || (a.x > this.width + 20 && b.x > this.width + 20) || (a.y > this.height + 20 && b.y > this.height + 20)) continue;
         const incident = highlighted && (edge.src === highlighted.gid || edge.dst === highlighted.gid);
-        const alpha = highlighted ? (incident ? .9 : .055) : this.visibleEdges.length < 750 ? .5 : .2;
-        ctx.strokeStyle = incident ? `rgba(56, 225, 198, ${alpha})` : `rgba(111, 157, 178, ${alpha})`;
-        ctx.lineWidth = (incident ? 1.3 : .5) + 1.4 * Math.log1p(edge.sum_kzt) / Math.log1p(edgeMax);
+        const alpha = highlighted ? (incident ? .96 : .1) : this.visibleEdges.length < 750 ? .58 : .28;
+        ctx.strokeStyle = incident ? `rgba(223, 186, 255, ${alpha})` : `rgba(155, 203, 244, ${alpha})`;
+        ctx.lineWidth = (incident ? 1.2 : .4) + (incident ? 1.3 : .7) * Math.sqrt(edge.sum_kzt / edgeMax);
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-        if (incident || this.visibleEdges.length < 300) this.drawArrow(ctx, a, b, alpha);
+        if (incident || this.visibleEdges.length < 300) this.drawArrow(ctx, a, b);
       }
       for (const node of this.visibleNodes) {
         const pos = this.screenPosition(node.gid);
@@ -715,27 +735,27 @@
         const selected = node.gid === this.selected?.gid;
         const hovered = node.gid === this.hover?.gid;
         const radius = selected ? 8 : hovered ? 7 : (this.visibleNodes.length < 100 ? 4 : 2.3) + Math.min(2.5, Math.log1p(node.total_kzt || 0) / 8);
-        ctx.globalAlpha = highlighted && !neighbors.has(node.gid) ? .22 : 1;
+        ctx.globalAlpha = highlighted && !neighbors.has(node.gid) ? .6 : 1;
         if (selected || hovered) {
-          ctx.beginPath(); ctx.arc(pos.x, pos.y, radius + 5, 0, Math.PI * 2); ctx.fillStyle = selected ? "rgba(56,225,198,.17)" : "rgba(255,255,255,.08)"; ctx.fill();
+          ctx.beginPath(); ctx.arc(pos.x, pos.y, radius + 5, 0, Math.PI * 2); ctx.fillStyle = selected ? "rgba(223,186,255,.32)" : "rgba(255,255,255,.08)"; ctx.fill();
         }
         ctx.beginPath(); ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
         ctx.fillStyle = this.nodeColor(node); ctx.fill();
         if (node.is_seed) { ctx.lineWidth = 1.5; ctx.strokeStyle = "#fff1d5"; ctx.stroke(); }
         if (selected || hovered || this.visibleNodes.length <= 20) {
           ctx.font = "11px system-ui"; ctx.textAlign = "center";
-          ctx.lineWidth = 4; ctx.strokeStyle = "#050e14";
+          ctx.lineWidth = 4; ctx.strokeStyle = "#0b1422";
           ctx.strokeText(shortGid(node.gid), pos.x, pos.y - radius - 7);
-          ctx.fillStyle = "#e8f1f8"; ctx.fillText(shortGid(node.gid), pos.x, pos.y - radius - 7);
+          ctx.fillStyle = "#ffffff"; ctx.fillText(shortGid(node.gid), pos.x, pos.y - radius - 7);
         }
       }
       ctx.globalAlpha = 1;
     },
 
-    drawArrow(ctx, a, b, alpha) {
+    drawArrow(ctx, a, b) {
       const angle = Math.atan2(b.y - a.y, b.x - a.x);
       const x = a.x + (b.x - a.x) * .82, y = a.y + (b.y - a.y) * .82;
-      ctx.fillStyle = `rgba(142, 180, 198, ${Math.min(.72, alpha + .2)})`;
+      ctx.fillStyle = ctx.strokeStyle;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x - Math.cos(angle - .55) * 5, y - Math.sin(angle - .55) * 5);
@@ -795,7 +815,7 @@
     const max = Math.max(...rows.flatMap(row => [row.in, row.out]), 1);
     const width = 250, height = 80;
     const path = key => rows.map((row, index) => `${index ? "L" : "M"}${(index / (rows.length - 1) * width).toFixed(1)},${(height - row[key] / max * (height - 8) - 4).toFixed(1)}`).join(" ");
-    return `<svg viewBox="0 0 ${width} ${height}" aria-label="Динамика узла"><path d="${path("in")}" fill="none" stroke="#38e1c6" stroke-width="2"/><path d="${path("out")}" fill="none" stroke="#ffb454" stroke-width="2"/></svg>`;
+    return `<svg viewBox="0 0 ${width} ${height}" aria-label="Динамика узла"><path d="${path("in")}" fill="none" stroke="#3cffcd" stroke-width="2"/><path d="${path("out")}" fill="none" stroke="#ffe373" stroke-width="2"/></svg>`;
   }
 
   const nodeExplanations = new Map();
@@ -858,21 +878,17 @@
     const incoming = [...(incomingById.get(node.gid) || [])].sort((a, b) => b.sum_kzt - a.sum_kzt);
     const badge = [
       node.is_seed ? `<span class="badge seed">seed</span>` : "",
-      node.truncated_by_depth ? `<span class="badge censored">depth-4 frontier</span>` : "",
+      node.truncated_by_depth ? `<span class="badge censored">Граница · шаг 4</span>` : "",
       node.role ? `<span class="badge role">${escapeHtml(roleLabel(node.role))} · ${fmtPercent(node.role_score)}</span>` : "",
-      `<span class="badge">cluster ${node.cluster_id}</span>`
+      `<span class="badge">Кластер ${node.cluster_id}</span>`
     ].join("");
     const neighborButtons = (edges, direction) => edges.slice(0, 6).map(edge => {
       const gid = direction === "out" ? edge.dst : edge.src;
       return `<button class="neighbor-button" data-gid="${gid}"><span>${direction === "out" ? "→" : "←"} ${escapeHtml(shortGid(gid))}</span><strong>${escapeHtml(fmtMoney(edge.sum_kzt))}</strong></button>`;
     }).join("") || `<span class="quiet-label">Нет наблюдаемых связей</span>`;
     inspector.innerHTML = `
-      <div class="inspector-head"><button id="closeInspector" class="inspector-close" aria-label="Закрыть карточку узла">×</button><span class="eyebrow">КАРТОЧКА УЗЛА</span><strong class="gid">${escapeHtml(node.gid)}</strong><div class="badge-row">${badge}</div></div>
-      <section id="nodeRoleExplanation" class="node-role-explanation" data-gid="${escapeHtml(node.gid)}">
-        <button id="generateNodeExplanation" type="button" class="button">Сгенерировать объяснение роли</button>
-        <p class="explanation-status" role="status"></p>
-        <div class="explanation-answer hidden" aria-live="polite"></div>
-      </section>
+      <div class="inspector-head"><button id="closeInspector" class="inspector-close" aria-label="Закрыть карточку узла">×</button><span class="eyebrow">Карточка клиента</span><strong class="gid">${escapeHtml(node.gid)}</strong><div class="badge-row">${badge}</div></div>
+
       <div class="node-stat-grid">
         <div class="node-stat"><span>Входящие</span><strong>${fmtMoney(node.in_kzt)}</strong></div>
         <div class="node-stat"><span>Исходящие</span><strong>${fmtMoney(node.out_kzt)}</strong></div>
@@ -880,13 +896,18 @@
         <div class="node-stat"><span>Получатели / tx</span><strong>${fmtInt(node.out_deg)} / ${fmtInt(node.out_tx)}</strong></div>
         <div class="node-stat"><span>PageRank</span><strong>${fmtScore(node.pagerank_amount)}</strong></div>
         <div class="node-stat"><span>Betweenness</span><strong>${fmtScore(node.betweenness)}</strong></div>
-        <div class="node-stat"><span>Уверенность роли</span><strong>${fmtPercent(node.role_score)}</strong></div>
+        <div class="node-stat"><span>Сила гипотезы</span><strong>${fmtPercent(node.role_score)}</strong></div>
         <div class="node-stat"><span>Приоритет проверки</span><strong>${fmtScore(node.priority_score)}</strong></div>
       </div>
       ${node.evidence ? `<div class="inspector-section"><h4>Числовые основания</h4><p class="evidence">${escapeHtml(node.evidence)}</p></div>` : ""}
       ${(node.secondary_role || node.uncertainty_reason) ? `<div class="inspector-section"><h4>Неопределённость</h4><p class="evidence">${node.secondary_role ? `Альтернатива: ${escapeHtml(roleLabel(node.secondary_role))}. ` : ""}${escapeHtml(node.uncertainty_reason || "Роли имеют близкие значения score.")}</p></div>` : ""}
       ${node.p_continue != null ? `<div class="inspector-section"><h4>${node.truncated_by_depth ? "Цензура выхода" : "Оценка продолжения"}</h4><p class="evidence">Оценка продолжения наблюдаемого маршрута p_continue=${escapeHtml(fmtScore(node.p_continue))}. ${node.truncated_by_depth ? "Выход на depth=4 не наблюдаем, поэтому terminal не следует из out_degree=0." : "Для этого узла выход наблюдаем; модель показана как дополнительный inbound-only сигнал."} Это не доказательство роли.</p></div>` : ""}
       ${node.truncated_by_depth ? `<div class="inspector-section"><h4>Ограничение</h4><p class="evidence">Исходящие связи после четвёртого шага не наблюдаются. Узел нельзя автоматически считать конечным получателем.</p></div>` : ""}
+      <section id="nodeRoleExplanation" class="node-role-explanation" data-gid="${escapeHtml(node.gid)}">
+        <button id="generateNodeExplanation" type="button" class="button">Сгенерировать объяснение роли</button>
+        <p class="explanation-status" role="status"></p>
+        <div class="explanation-answer hidden" aria-live="polite"></div>
+      </section>
       <div class="inspector-section"><h4>Динамика · вход / выход</h4>${sparklineForNode(node.gid)}</div>
       <div class="inspector-section"><h4>Крупнейшие исходящие</h4><div class="neighbor-list">${neighborButtons(outgoing, "out")}</div></div>
       <div class="inspector-section"><h4>Крупнейшие входящие</h4><div class="neighbor-list">${neighborButtons(incoming, "in")}</div></div>`;
@@ -1177,7 +1198,6 @@
     });
   }
 
-  setupNavigation();
   renderHeader();
   renderMetrics();
   renderOverview();
@@ -1189,6 +1209,7 @@
   renderQuality();
   setupAi();
   network.setup();
+  setupNavigation();
   window.HackAlemNarratives?.init();
   window.HACKALEM_READY = true;
 })();

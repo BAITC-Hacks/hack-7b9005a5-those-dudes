@@ -35,7 +35,7 @@ function harness(width = 900, height = 500) {
     D, $, $$: () => [], window: { devicePixelRatio: 2 },
     ResizeObserver: class { constructor(callback) { observer = callback; } observe() {} },
     clamp: (v, lo, hi) => Math.max(lo, Math.min(hi, v)),
-    fmtInt: String, fmtMoney: String, escapeHtml: String, shortGid: String,
+    fmtInt: String, fmtMoney: String, escapeHtml: String, shortGid: String, roleLabel: String,
     COLORS: { depth: ['a', 'b', 'c', 'd', 'e'], cluster: ['a', 'b'], role: {} },
     nodeById: new Map(D.nodes.map(node => [node.gid, node])),
     openNode: gid => opened.push(gid),
