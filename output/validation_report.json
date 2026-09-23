@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "schema_and_invariants": {
+    "nodes_row_count_matches_input": true,
+    "nodes_unique_gid": true,
+    "nodes_gid_set_matches_input": true,
+    "nodes_mandatory_columns": true,
+    "roles_valid": true,
+    "role_scores_in_range": true,
+    "priority_scores_in_range": true,
+    "evidence_nonempty_numeric_under_200": true,
+    "clusters_mandatory_columns": true,
+    "all_nodes_have_cluster": true,
+    "top_mandatory_columns": true,
+    "top_has_at_least_20": true,
+    "top_sorted_descending": true,
+    "no_missing_mandatory_values": true
+  },
+  "synthetic_motifs": {
+    "passed": true,
+    "checks": {
+      "fifo_same_day_amount": true,
+      "fifo_next_day_amount": true,
+      "fan_in_detectable": true,
+      "fan_out_detectable": true,
+      "reciprocal_detectable": true,
+      "cycle_detectable": true,
+      "ari_label_invariant": true
+    },
+    "note": "Synthetic checks validate detection mechanics and expected ordering, not real-world accuracy."
+  },
+  "interpretation": "Проверки измеряют корректность и устойчивость процедуры без ground truth; они не подтверждают роль или вину клиента."
+}

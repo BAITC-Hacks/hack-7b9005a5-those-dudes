@@ -1,0 +1,7 @@
+# Core, fully local analytics stack. No cloud or LLM dependency is required.
+numpy>=2.0,<3
+pandas>=2.2,<3
+pyarrow>=18,<23
+scipy>=1.13,<2
+networkx>=3.4,<4
+python-dotenv>=1.0,<2

@@ -1,0 +1,90 @@
+{
+  "status": "ok",
+  "methodology": "deterministic_explainable_data_only",
+  "interpretation": "Роли и приоритеты — гипотезы для проверки аналитиком, не вывод о виновности.",
+  "config": {
+    "data_dir": "C:\\Users\\user\\Desktop\\repo\\Hackathons\\hackalem\\input_data\\data",
+    "output_dir": "C:\\Users\\user\\Desktop\\repo\\Hackathons\\hackalem\\output",
+    "random_seed": 42,
+    "cluster_runs": 16,
+    "role_stability_runs": 40,
+    "top_n": 50,
+    "validate": true
+  },
+  "input_checks": {
+    "n_nodes": 2248,
+    "n_edges": 3119,
+    "n_transactions": 4840,
+    "n_exact_duplicate_transaction_rows": 97,
+    "n_seed": 81,
+    "n_isolated_nodes": 19,
+    "total_kzt": 365890012.01,
+    "date_min": "2026-07-01",
+    "date_max": "2026-07-31",
+    "edge_transaction_reconciliation": true,
+    "sha256": {
+      "nodes": "d2a45b0df6e9352832d5fb09839d10b9e23f898156c3bab263b051b31cc0296d",
+      "edges": "4e71dde5cd3115bcb26e91202665532ee6581cf8233a9fc8059ea59fb7358a38",
+      "transactions": "c30c5317b5439591dde86f2058dc47a3d19b2900c055ded994fe547f6fb7e7da"
+    }
+  },
+  "graph": {
+    "n_nodes": 2248,
+    "n_edges": 3119,
+    "n_weak_components": 35,
+    "largest_weak_component": 1877
+  },
+  "role_counts": {
+    "peripheral": 1460,
+    "terminal": 469,
+    "transit": 168,
+    "consolidator": 82,
+    "distributor": 66,
+    "coordinator": 3
+  },
+  "cluster_metadata": {
+    "method": "louvain_symmetrized_amount_medoid",
+    "direction_tradeoff": "Louvain использует симметризованную проекцию; направленные признаки сохранены отдельно",
+    "n_runs": 16,
+    "random_seed": 42,
+    "medoid_run": 13,
+    "n_clusters": 89,
+    "pairwise_ari_median": 0.9194592040421743,
+    "pairwise_ari_min": 0.8029877545282348,
+    "amount_vs_count_ari": 0.4353918176713035,
+    "optional_infomap_available": false,
+    "optional_leiden_available": false,
+    "optional_sbm_available": false,
+    "challenger_note": "Infomap/Leiden/SBM не блокируют локальный baseline; при установке их следует сравнивать по ARI/VI, а не смешивать границы автоматически"
+  },
+  "motif_metadata": {
+    "n_reciprocal_pairs": 177,
+    "n_cycles_length_2_6": 1541,
+    "n_temporally_ordered_cycles_7d": 187
+  },
+  "timings": {
+    "load_and_validate_seconds": 0.07714420001138933,
+    "features_seconds": 9.843568500014953,
+    "clustering_seconds": 1.8494439999922179,
+    "roles_and_priority_seconds": 0.31135429997812025,
+    "resilience_and_tables_seconds": 2.981708899984369,
+    "write_and_validate_seconds": 0.2602086999977473,
+    "total_seconds": 15.32350349999615
+  },
+  "runtime": {
+    "python": "3.12.14",
+    "pandas": "3.0.1",
+    "networkx": "3.5",
+    "numpy": "2.5.3"
+  },
+  "outputs": [
+    "nodes_roles.csv",
+    "clusters.csv",
+    "top_nodes.csv",
+    "resilience.csv",
+    "features.csv",
+    "thresholds.json",
+    "validation_report.json",
+    "run_metadata.json"
+  ]
+}

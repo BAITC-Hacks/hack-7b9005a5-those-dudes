@@ -1,0 +1,113 @@
+{
+  "roles": [
+    "consolidator",
+    "transit",
+    "distributor",
+    "terminal",
+    "coordinator",
+    "peripheral"
+  ],
+  "thresholds": {
+    "in_degree_q95_positive_nonseed": 3.0,
+    "out_degree_q90_positive_nonseed": 8.0,
+    "in_kzt_median_positive_nonseed": 50000.0,
+    "fifo_transit": 0.8,
+    "flow_share_gate": 0.8,
+    "coordinator_rank_gate": 0.9,
+    "coordinator_score_gate": 0.75,
+    "terminal_continue_allow": 0.2,
+    "terminal_continue_reject": 0.5,
+    "ambiguity_margin": 0.1
+  },
+  "integer_gates": {
+    "in_degree": 3,
+    "out_degree": 8
+  },
+  "role_score_formula": "observability*(0.45*profile+0.30*min(1,margin/0.25)+0.25*score_perturbation_stability)",
+  "priority_formula": "ECDF(0.30*K+0.22*E+0.18*S+0.15*T+0.10*X+0.05*U)",
+  "score_perturbation_runs": 40,
+  "random_seed": 42,
+  "continuation_model": {
+    "model": "l2_logistic_irls_standardized",
+    "target": "observed_out_degree_gt_0_on_depth_1_3",
+    "n_train": 1723,
+    "positive_rate": 0.3737666860127684,
+    "iterations": 6,
+    "regularization": 1.0,
+    "train_brier": 0.1958214259632825,
+    "train_auc_descriptive_only": 0.7055935159654384,
+    "features": [
+      "in_deg",
+      "in_tx",
+      "in_kzt",
+      "active_in_days",
+      "in_source_hhi",
+      "direct_seed_in",
+      "seed_affinity",
+      "first_in_day",
+      "last_in_day"
+    ],
+    "means": {
+      "in_deg": 0.8423751586787395,
+      "in_tx": 0.9773759811963787,
+      "in_kzt": 11.065786747915018,
+      "active_in_days": 0.9126158456665306,
+      "in_source_hhi": 0.8884700232849839,
+      "direct_seed_in": 0.19468640187072134,
+      "seed_affinity": 0.29659270020857803,
+      "first_in_day": 14.435867672663958,
+      "last_in_day": 17.869994196169472
+    },
+    "scales": {
+      "in_deg": 0.3086700066852886,
+      "in_tx": 0.49333597612339425,
+      "in_kzt": 1.3715222377699516,
+      "active_in_days": 0.40345794521300166,
+      "in_source_hhi": 0.21847183383658772,
+      "direct_seed_in": 0.3202404565220279,
+      "seed_affinity": 0.17677095197858153,
+      "first_in_day": 8.931013847523051,
+      "last_in_day": 8.893543299504627
+    },
+    "standardized_coefficients": {
+      "intercept": -0.5228025887216455,
+      "in_deg": 0.36972919078493754,
+      "in_tx": -0.018529868382368704,
+      "in_kzt": -0.13053763152591635,
+      "active_in_days": 0.7969040967032462,
+      "in_source_hhi": -0.03301577799015044,
+      "direct_seed_in": -0.12243637003215266,
+      "seed_affinity": -0.12427961346478685,
+      "first_in_day": 0.051661188286163715,
+      "last_in_day": -0.060511961768759115
+    },
+    "limitation": "Оценивает продолжение наблюдаемого маршрута, а не истинную роль; depth=4 остаётся правоцензурирован"
+  },
+  "clustering": {
+    "method": "louvain_symmetrized_amount_medoid",
+    "direction_tradeoff": "Louvain использует симметризованную проекцию; направленные признаки сохранены отдельно",
+    "n_runs": 16,
+    "random_seed": 42,
+    "medoid_run": 13,
+    "n_clusters": 89,
+    "pairwise_ari_median": 0.9194592040421743,
+    "pairwise_ari_min": 0.8029877545282348,
+    "amount_vs_count_ari": 0.4353918176713035,
+    "optional_infomap_available": false,
+    "optional_leiden_available": false,
+    "optional_sbm_available": false,
+    "challenger_note": "Infomap/Leiden/SBM не блокируют локальный baseline; при установке их следует сравнивать по ARI/VI, а не смешивать границы автоматически"
+  },
+  "motifs": {
+    "n_reciprocal_pairs": 177,
+    "n_cycles_length_2_6": 1541,
+    "n_temporally_ordered_cycles_7d": 187
+  },
+  "sampling_constraints": [
+    "four-hop outgoing-only crawl",
+    "depth-4 outflow is right-censored",
+    "transactions below 5000 KZT are absent",
+    "seed inflow from outside the crawl is incomplete",
+    "daily dates do not identify within-day order"
+  ]
+}

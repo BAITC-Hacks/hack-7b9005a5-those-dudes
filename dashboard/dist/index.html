@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Локальный интерактивный обзор транзакционной сети HackAlem">
+  <title>Граф денег — исследовательская панель</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23071118'/%3E%3Cpath d='M13 45 28 19l10 16 13-20' fill='none' stroke='%2338e1c6' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='13' cy='45' r='5' fill='%23ffb454'/%3E%3Ccircle cx='28' cy='19' r='5' fill='%23e8f1f8'/%3E%3Ccircle cx='38' cy='35' r='5' fill='%23e8f1f8'/%3E%3Ccircle cx='51' cy='15' r='5' fill='%23ffb454'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dashboard-loading">
+  <section id="dashboardLoader" class="dashboard-loader" role="status" aria-live="polite">
+    <div class="panel">
+      <p class="eyebrow">ГРАФ ДЕНЕГ</p>
+      <h2 id="dashboardLoadTitle">Открываем ваш анализ</h2>
+      <p id="dashboardLoadMessage">Проверяем готовность набора данных…</p>
+      <a class="button secondary" href="/">Вернуться к загрузке файлов</a>
+    </div>
+  </section>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <div>
+        <h1>Граф денег</h1>
+        <p>Локальная исследовательская панель</p>
+      </div>
+    </div>
+    <div class="dashboard-actions">
+      <a class="button secondary new-analysis" href="/">Новый анализ</a>
+      <a id="exportAll" class="button" data-export="results.zip" aria-disabled="true" download="hackalem_results.zip" title="ZIP-архив: nodes_roles.csv, clusters.csv, top_nodes.csv">Скачать 3 CSV ↓</a>
+      <details class="export-menu">
+        <summary aria-label="Скачать CSV по отдельности" title="Скачать CSV по отдельности">⋯</summary>
+        <div class="export-options">
+          <p>Скачать отдельно</p>
+          <a data-export="nodes_roles.csv" aria-disabled="true" download="nodes_roles.csv">nodes_roles.csv <small>Роль, числовые основания и объяснение каждого узла</small></a>
+          <a data-export="clusters.csv" aria-disabled="true" download="clusters.csv">clusters.csv <small>Описание кластеров</small></a>
+          <a data-export="top_nodes.csv" aria-disabled="true" download="top_nodes.csv">top_nodes.csv <small>Приоритет ручной проверки</small></a>
+        </div>
+      </details>
+    </div>
+  </header>
+
+  <div class="shell">
+    <aside class="sidebar" aria-label="Разделы">
+      <nav class="nav-list">
+        <button class="nav-item active" data-view="network">
+          <span class="nav-index">01</span><span>Сеть</span>
+        </button>
+        <button class="nav-item" data-view="overview">
+          <span class="nav-index">02</span><span>Обзор</span>
+        </button>
+        <button class="nav-item" data-view="transactions">
+          <span class="nav-index">03</span><span>Транзакции</span>
+        </button>
+        <button class="nav-item" data-view="patterns">
+          <span class="nav-index">04</span><span>Паттерны</span>
+        </button>
+        <button class="nav-item" data-view="analytics">
+          <span class="nav-index">05</span><span>Роли и приоритет</span>
+        </button>
+        <button class="nav-item" data-view="clusters">
+          <span class="nav-index">06</span><span>Кластеры</span>
+        </button>
+        <button class="nav-item" data-view="ai">
+          <span class="nav-index">07</span><span>AI-аналитик</span>
+        </button>
+        <button class="nav-item" data-view="data">
+          <span class="nav-index">08</span><span>Данные</span>
+        </button>
+        <button class="nav-item" data-view="method">
+          <span class="nav-index">09</span><span>Методика</span>
+        </button>
+      </nav>
+      <div class="sidebar-note">
+        <strong>Только гипотезы</strong>
+        <p>Метрики помогают расставить приоритеты, но не устанавливают виновность.</p>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <div class="dataset-provenance"><span id="datasetLabel">Набор данных</span><span id="periodLabel">Загрузка данных…</span></div>
+      <div id="errorBanner" class="error-banner hidden" role="alert"></div>
+
+      <details id="csvExplanationPanel" class="panel csv-explanations">
+        <summary>
+          <span class="csv-explanation-title">AI-объяснения для CSV <small id="csvExplanationCoverage">Проверяем сохранённые объяснения…</small></span>
+          <span id="csvExplanationBadge" class="csv-explanation-badge">Настроить</span>
+        </summary>
+        <div class="csv-explanation-body">
+          <p>Для каждого выбранного узла агент объяснит назначенную роль, основания, приоритет проверки и ограничения. Роли и оценки остаются рассчитанными по правилам. Это гипотезы, не вывод о виновности.</p>
+          <div class="csv-explanation-controls">
+            <label class="control"><span>Какие узлы объяснить</span><select id="csvExplanationScope"><option value="all">Все узлы</option><option value="top">Только top_nodes.csv</option></select></label>
+            <div class="csv-explanation-buttons"><button id="csvExplanationStart" class="button" type="button" disabled>Сгенерировать через API</button><button id="csvExplanationCancel" class="button secondary hidden" type="button">Остановить</button><button id="csvExplanationRefresh" class="button secondary" type="button">Обновить статус</button></div>
+          </div>
+          <label class="csv-explanation-consent"><input id="csvExplanationConsent" type="checkbox"><span>Разрешаю отправить метрики выбранных узлов в OpenAI без gid, контрагентов и отдельных транзакций. Запросы используют мой API-ключ и оплачиваются по тарифу API. Время зависит от числа узлов и лимитов API; этот этап не входит в локальный анализ. Сохранённые ответы повторно не генерируются.</span></label>
+          <div class="csv-explanation-progress"><progress id="csvExplanationProgress" max="1" value="0" aria-label="Готовность AI-объяснений"></progress><span id="csvExplanationCounts">Готовых API-объяснений: —</span></div>
+          <p id="csvExplanationStatus" role="status" aria-live="polite">Автоматическая отправка в OpenAI отключена. Генерация начнётся только после вашего подтверждения.</p>
+          <p id="csvExplanationUsage" class="quiet-label"></p>
+          <p class="csv-explanation-export-note">Кнопка «Скачать 3 CSV» скачивает последнюю сохранённую версию. В nodes_roles.csv и top_nodes.csv появятся структурированные основания и объяснения; строки без готового API-ответа отмечены отдельно. clusters.csv не изменяется.</p>
+        </div>
+      </details>
+
+      <section class="view active" id="view-network" aria-labelledby="network-title">
+        <div class="view-heading compact-heading">
+          <div>
+            <p class="eyebrow">НАПРАВЛЕННАЯ СЕТЬ</p>
+            <h2 id="network-title">Исследование связей</h2>
+          </div>
+          <div class="heading-actions">
+            <label class="search-field">
+              <span>Найти gid</span>
+              <input id="nodeSearch" type="search" inputmode="numeric" autocomplete="off" placeholder="Введите идентификатор">
+            </label>
+            <button id="resetNetwork" class="button secondary">Сбросить вид</button>
+          </div>
+        </div>
+
+        <div class="metric-strip" id="networkMetrics"></div>
+
+        <div class="network-layout">
+          <section class="panel filter-panel" aria-label="Фильтры сети">
+            <div class="panel-title-row">
+              <h3>Фильтры</h3>
+              <span id="visibleCount" class="quiet-label">—</span>
+            </div>
+            <label class="control">
+              <span>Компонента</span>
+              <select id="componentFilter"></select>
+            </label>
+            <label class="control">
+              <span>Кластер</span>
+              <select id="clusterFilter"></select>
+            </label>
+            <fieldset class="control depth-control">
+              <legend>Глубина</legend>
+              <div id="depthChecks" class="checkbox-row"></div>
+            </fieldset>
+            <label class="control">
+              <span>Минимальная сумма ребра</span>
+              <input id="amountFilter" type="range" min="0" max="100" value="0">
+              <output id="amountFilterLabel">0 KZT</output>
+            </label>
+            <label class="control">
+              <span>Цвет узла</span>
+              <select id="colorMode">
+                <option value="depth">Глубина</option>
+                <option value="cluster">Кластер</option>
+                <option value="status">Seed / цензура</option>
+                <option value="role">Роль, если рассчитана</option>
+              </select>
+            </label>
+            <label class="control">
+              <span>Раскладка</span>
+              <select id="layoutMode">
+                <option value="depth">По глубине обхода</option>
+                <option value="cluster">По кластерам</option>
+              </select>
+            </label>
+            <div class="toggle-stack">
+              <label><input id="seedOnly" type="checkbox"> Только seed</label>
+              <label><input id="censoredOnly" type="checkbox"> Только depth-4 frontier</label>
+            </div>
+            <div id="networkLegend" class="legend"></div>
+          </section>
+
+          <section class="network-stage panel">
+            <canvas id="networkCanvas" tabindex="0" aria-label="Интерактивная схема транзакционной сети. Плюс и минус — масштаб, ноль — вписать граф."></canvas>
+            <div class="graph-toolbar" role="group" aria-label="Масштаб графа">
+              <button id="zoomOut" type="button" aria-label="Уменьшить масштаб" title="Уменьшить">−</button>
+              <output id="networkZoom" aria-label="Текущий масштаб">100%</output>
+              <button id="zoomIn" type="button" aria-label="Увеличить масштаб" title="Увеличить">+</button>
+              <button id="fitNetwork" type="button" title="Показать все отфильтрованные узлы">Вписать граф</button>
+            </div>
+            <div class="canvas-hint">Колесо — масштаб · перетаскивание — панорама · клик — карточка узла</div>
+            <div id="networkTooltip" class="tooltip hidden"></div>
+          </section>
+
+          <aside class="panel inspector" id="nodeInspector">
+            <div class="empty-state">
+              <div class="empty-symbol">◎</div>
+              <h3>Выберите узел</h3>
+              <p>Кликните по точке на графе или найдите точный gid.</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view" id="view-overview" aria-labelledby="overview-title">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">ПОЛНЫЙ СРЕЗ ДАННЫХ</p>
+            <h2 id="overview-title">Обзор выборки</h2>
+            <p>Масштаб, динамика и ограничения четырёхшагового исходящего обхода.</p>
+          </div>
+        </div>
+        <div class="metric-grid" id="overviewMetrics"></div>
+        <div class="chart-grid">
+          <section class="panel chart-panel wide">
+            <div class="panel-title-row"><h3>Дневной оборот и число переводов</h3><span id="dailyPeriodLabel">Период выборки</span></div>
+            <div id="dailyChart" class="chart"></div>
+          </section>
+          <section class="panel chart-panel">
+            <div class="panel-title-row"><h3>Узлы по глубине</h3><span>0 = seed</span></div>
+            <div id="depthChart" class="chart"></div>
+          </section>
+          <section class="panel chart-panel">
+            <div class="panel-title-row"><h3>Распределение сумм</h3><span>Логарифмическая шкала</span></div>
+            <div id="amountHistogram" class="chart"></div>
+          </section>
+          <section class="panel table-panel wide">
+            <div class="panel-title-row"><h3>Крупнейшие агрегированные потоки</h3><span>По сумме</span></div>
+            <div id="topEdgesTable"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-transactions" aria-labelledby="transactions-title">
+        <div class="view-heading compact-heading">
+          <div>
+            <p class="eyebrow" id="transactionTotalLabel">СОБЫТИЯ ВЫБОРКИ</p>
+            <h2 id="transactions-title">Транзакции</h2>
+          </div>
+          <div class="heading-actions transaction-controls">
+            <label class="search-field"><span>gid или часть gid</span><input id="txGidFilter" type="search" placeholder="Все узлы"></label>
+            <label class="search-field"><span>Минимум, KZT</span><input id="txMinAmount" type="number" min="0" step="5000" value="0"></label>
+          </div>
+        </div>
+        <div class="metric-strip" id="transactionMetrics"></div>
+        <div class="chart-grid transactions-grid">
+          <section class="panel chart-panel wide">
+            <div class="panel-title-row"><h3>Активность по дням</h3><span id="txFilterSummary">Все транзакции</span></div>
+            <div id="txTimeline" class="chart"></div>
+          </section>
+          <section class="panel chart-panel">
+            <div class="panel-title-row"><h3>Сумма одной транзакции</h3><span>Распределение</span></div>
+            <div id="txAmountHistogram" class="chart"></div>
+          </section>
+          <section class="panel chart-panel">
+            <div class="panel-title-row"><h3>Повторяемость маршрутов</h3><span>Транзакций на паре</span></div>
+            <div id="repeatChart" class="chart"></div>
+          </section>
+          <section class="panel table-panel full">
+            <div class="panel-title-row"><h3>Журнал переводов</h3><span id="txTableCount">—</span></div>
+            <div id="transactionsTable"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-patterns" aria-labelledby="patterns-title">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">ПОТОКОВЫЕ И ВРЕМЕННЫЕ СИГНАЛЫ</p>
+            <h2 id="patterns-title">Наблюдаемые паттерны</h2>
+            <p>Кандидаты для проверки, а не доказательства назначения счёта. FIFO использует только видимые входы и выходы.</p>
+          </div>
+        </div>
+        <div class="metric-strip" id="patternMetrics"></div>
+        <div class="chart-grid patterns-grid">
+          <section class="panel chart-panel wide">
+            <div class="panel-title-row"><h3>Fan-in и fan-out</h3><span>Логарифмические степени · цвет = depth</span></div>
+            <div id="fanScatter" class="chart"></div>
+          </section>
+          <section class="panel chart-panel">
+            <div class="panel-title-row"><h3>Отношение out / in</h3><span>Non-seed с входом и выходом</span></div>
+            <div id="passThroughHistogram" class="chart"></div>
+          </section>
+          <section class="panel table-panel">
+            <div class="panel-title-row"><h3>FIFO ≤1 день</h3><span>Крупнейший сопоставимый поток</span></div>
+            <div id="fifoTable"></div>
+          </section>
+          <section class="panel table-panel">
+            <div class="panel-title-row"><h3>Прямые multi-seed получатели</h3><span>≥2 seed-плательщика</span></div>
+            <div id="multiSeedTable"></div>
+          </section>
+          <section class="panel table-panel">
+            <div class="panel-title-row"><h3>Взаимные пары</h3><span>Топологический кандидат</span></div>
+            <div id="reciprocalTable"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-analytics" aria-labelledby="analytics-title">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">ОБЪЯСНИМЫЕ ГИПОТЕЗЫ</p>
+            <h2 id="analytics-title">Роли, уверенность и приоритет</h2>
+            <p>Роль описывает наблюдаемый профиль узла, уверенность — устойчивость этой гипотезы, а приоритет задаёт порядок ручной проверки. Эти показатели намеренно разделены.</p>
+          </div>
+          <div id="productionBadge" class="source-badge">Проверка выходов backend…</div>
+        </div>
+        <div id="productionBanner" class="notice-panel"></div>
+        <div class="metric-grid" id="roleMetrics"></div>
+        <div class="chart-grid analytics-grid">
+          <section class="panel chart-panel">
+            <div class="panel-title-row"><h3>Распределение ролей</h3><span>Число узлов</span></div>
+            <div id="roleDistribution" class="chart"></div>
+          </section>
+          <section class="panel table-panel">
+            <div class="panel-title-row"><h3>Высокий приоритет</h3><span>Не означает виновность</span></div>
+            <div id="priorityTable"></div>
+          </section>
+          <section class="panel table-panel">
+            <div class="panel-title-row"><h3>Неопределённые кандидаты</h3><span>Высокая ценность дополнительной проверки</span></div>
+            <div id="uncertaintyTable"></div>
+          </section>
+          <section class="panel chart-panel">
+            <div class="panel-title-row"><h3>Устойчивость сети</h3><span>Удаление top-N</span></div>
+            <div id="resilienceChart" class="chart"></div>
+            <div id="resilienceTable" class="compact-table"></div>
+          </section>
+          <section class="panel validation-panel wide">
+            <div class="panel-title-row"><h3>Валидация без разметки</h3><span>Стабильность процедуры, не доказательство истинности</span></div>
+            <div id="validationCards" class="validation-grid"></div>
+          </section>
+          <section class="panel table-panel wide">
+            <div class="panel-title-row"><h3>Пороговые значения и воспроизводимость</h3><span>Data-adaptive настройки backend</span></div>
+            <div id="thresholdsSummary"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-clusters" aria-labelledby="clusters-title">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">СТРУКТУРА ГРАФА</p>
+            <h2 id="clusters-title">Компоненты и кластеры</h2>
+            <p id="clusterMethodText">Louvain используется как исследовательский baseline на симметризованном графе. Кластер не равен организованной группе.</p>
+          </div>
+        </div>
+        <div class="metric-grid" id="clusterMetrics"></div>
+        <div class="split-panels">
+          <section class="panel table-panel">
+            <div class="panel-title-row"><h3>Кластеры</h3><span>Нажмите для просмотра</span></div>
+            <div id="clustersTable"></div>
+          </section>
+          <section class="panel table-panel">
+            <div class="panel-title-row"><h3>Слабосвязные компоненты</h3><span>Включая изоляты</span></div>
+            <div id="componentsTable"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-ai" aria-labelledby="ai-title">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">READ-ONLY ПОМОЩНИК</p>
+            <h2 id="ai-title">AI-аналитик</h2>
+            <p>Помощник запрашивает только локальный <code>POST /api/query</code>. При недоступном API панель остаётся в офлайн-режиме и показывает детерминированные сведения из текущего bundle.</p>
+          </div>
+          <div id="aiApiStatus" class="source-badge offline">Офлайн-режим</div>
+        </div>
+        <div class="ai-layout">
+          <section class="panel ai-chat-panel">
+            <div id="aiConversation" class="ai-conversation" aria-live="polite">
+              <article class="message assistant-message">
+                <span>AI-аналитик</span>
+                <p>Спросите, почему узел получил высокий приоритет, чем обоснована его роль или как интерпретировать depth-4 цензуру. Ответы должны рассматриваться как гипотезы для проверки.</p>
+              </article>
+            </div>
+            <form id="aiForm" class="ai-form">
+              <label for="aiQuestion">Вопрос аналитику</label>
+              <textarea id="aiQuestion" rows="3" placeholder="Например: почему gid … находится в top-20?"></textarea>
+              <div class="ai-form-actions">
+                <span id="aiRequestState" class="quiet-label">Запрос не отправлялся</span>
+                <button id="aiSubmit" type="submit" class="button">Отправить</button>
+              </div>
+            </form>
+          </section>
+          <aside class="panel ai-side-panel">
+            <div class="panel-title-row"><h3>Быстрые запросы</h3><span>Локальные подсказки</span></div>
+            <div id="aiSuggestions" class="suggestion-list">
+              <button data-prompt="Покажи узлы с самым высоким приоритетом и объясни компоненты score">Кого проверять первым?</button>
+              <button data-prompt="Покажи транзитные узлы с FIFO не менее 80% в пределах одного дня">Транзит за один день</button>
+              <button data-prompt="Какие depth-4 узлы имеют высокую неопределённость terminal-роли?">Цензурированные terminal</button>
+              <button data-prompt="Что происходит со связностью после удаления top-20 узлов?">Устойчивость top-20</button>
+            </div>
+            <div class="ai-guardrails">
+              <h3>Границы ответа</h3>
+              <ul>
+                <li>Только данные текущей выборки.</li>
+                <li>Без внешнего обогащения клиентов.</li>
+                <li>Без утверждений о виновности.</li>
+                <li>Числовые основания обязательны.</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view" id="view-data" aria-labelledby="data-title">
+        <div class="view-heading compact-heading">
+          <div>
+            <p class="eyebrow">ИСХОДНЫЕ И ПРОИЗВОДНЫЕ ПОЛЯ</p>
+            <h2 id="data-title">Таблицы данных</h2>
+          </div>
+          <div class="heading-actions">
+            <label class="control inline-control"><span>Таблица</span><select id="dataTableSelect"><option value="nodes">Узлы</option><option value="edges">Рёбра</option><option value="transactions">Транзакции</option></select></label>
+            <label class="search-field"><span>Поиск</span><input id="dataSearch" type="search" placeholder="Любое поле"></label>
+          </div>
+        </div>
+        <section class="panel data-table-panel">
+          <div class="panel-title-row">
+            <h3 id="dataTableTitle">Узлы</h3>
+            <div class="pagination"><button id="dataPrev" class="button secondary">←</button><span id="dataPageLabel">1 / 1</span><button id="dataNext" class="button secondary">→</button></div>
+          </div>
+          <div id="rawDataTable"></div>
+        </section>
+      </section>
+
+      <section class="view" id="view-method" aria-labelledby="method-title">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">ИНТЕРПРЕТАЦИЯ</p>
+            <h2 id="method-title">Как читать панель</h2>
+          </div>
+        </div>
+        <div class="method-grid">
+          <article class="panel method-card accent-card">
+            <span class="card-number">01</span><h3>Направление сохранено</h3>
+            <p>Каждое ребро идёт от плательщика к получателю. Толщина отражает сумму, но не является оценкой риска.</p>
+          </article>
+          <article class="panel method-card">
+            <span class="card-number">02</span><h3>Depth-4 — граница наблюдения</h3>
+            <p id="censoredMethodText">На depth = 4 исходящие переводы не исследовались дальше. Нулевой выход здесь нельзя считать доказательством «оседания» денег.</p>
+          </article>
+          <article class="panel method-card">
+            <span class="card-number">03</span><h3>Баланс неполный</h3>
+            <p>Граф собран исходящим обходом. Внешние входы, межбанковские операции и переводы ниже 5 000 KZT отсутствуют.</p>
+          </article>
+          <article class="panel method-card">
+            <span class="card-number">04</span><h3>Кластеры — навигация</h3>
+            <p>Louvain помогает разделить крупную сеть для просмотра, но не доказывает принадлежность к общей организации.</p>
+          </article>
+          <article class="panel method-card">
+            <span class="card-number">05</span><h3>Центральность — не вина</h3>
+            <p>PageRank, HITS и betweenness показывают положение в наблюдаемом графе. Они задают приоритет ручной проверки.</p>
+          </article>
+          <article class="panel method-card">
+            <span class="card-number">06</span><h3>Данные остаются локально</h3>
+            <p>Расчёты и визуализации локальны. Генерация объяснений через API отправляет в OpenAI числовые метрики выбранных узлов без gid и журнала переводов. Для CSV запуск требует отдельного подтверждения. Источник объяснения указывается явно.</p>
+          </article>
+        </div>
+        <section class="panel quality-panel">
+          <div class="panel-title-row"><h3>Проверки качества</h3><span id="qualityStatus">—</span></div>
+          <div id="qualityChecks" class="quality-checks"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="/narratives.js"></script>
+  <script src="/bootstrap.js"></script>
+</body>
+</html>

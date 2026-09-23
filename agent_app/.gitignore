@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+evals/results/*
+!evals/results/.gitignore
+!evals/results/latest.json

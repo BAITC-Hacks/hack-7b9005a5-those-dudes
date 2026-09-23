@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Загрузите три Parquet-файла для локального анализа транзакционной сети">
+  <title>Новый анализ — Граф денег</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/upload.css">
+</head>
+<body class="upload-page">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div><h1>Граф денег</h1><p>Локальная исследовательская панель</p></div>
+    </div>
+    <div class="topbar-status"><span class="status-dot"></span><span>Данные обрабатываются локально</span></div>
+  </header>
+
+  <main class="upload-workspace">
+    <section class="upload-intro" aria-labelledby="upload-title">
+      <p class="eyebrow">ОТ ФАЙЛОВ К ОБЪЯСНИМОЙ СЕТИ</p>
+      <h2 id="upload-title">Начните с ваших данных</h2>
+      <p>Добавьте узлы, связи и транзакции. Панель проверит согласованность файлов, рассчитает роли и приоритеты, затем откроет интерактивный граф.</p>
+      <ol class="upload-steps" aria-label="Этапы анализа">
+        <li class="active"><span>01</span>Загрузите 3 файла</li>
+        <li><span>02</span>Исследуйте сеть</li>
+        <li><span>03</span>Скачайте 3 CSV</li>
+      </ol>
+    </section>
+
+    <section class="panel upload-panel" aria-labelledby="files-title">
+      <div class="panel-title-row"><h3 id="files-title">Исходные файлы</h3><span>Формат .parquet</span></div>
+      <form id="uploadForm">
+        <fieldset id="uploadFields" class="upload-fields">
+          <legend class="visually-hidden">Три обязательные таблицы</legend>
+          <label class="file-card" for="nodesFile">
+            <span class="file-number">01 / УЗЛЫ</span>
+            <strong>nodes.parquet</strong>
+            <span class="file-description">Идентификаторы, глубина обхода и seed-узлы</span>
+            <input id="nodesFile" name="nodes" type="file" accept=".parquet" required aria-describedby="nodesSchema nodesSelection">
+            <span id="nodesSelection" class="file-selection">Файл не выбран</span>
+            <code id="nodesSchema">gid · depth · is_seed</code>
+          </label>
+          <label class="file-card" for="edgesFile">
+            <span class="file-number">02 / СВЯЗИ</span>
+            <strong>edges.parquet</strong>
+            <span class="file-description">Направленные связи с суммой и числом переводов</span>
+            <input id="edgesFile" name="edges" type="file" accept=".parquet" required aria-describedby="edgesSchema edgesSelection">
+            <span id="edgesSelection" class="file-selection">Файл не выбран</span>
+            <code id="edgesSchema">src · dst · sum_kzt · n_tx · depth</code>
+          </label>
+          <label class="file-card" for="transactionsFile">
+            <span class="file-number">03 / ПЕРЕВОДЫ</span>
+            <strong>transactions.parquet</strong>
+            <span class="file-description">Отдельные транзакции и даты их проведения</span>
+            <input id="transactionsFile" name="transactions" type="file" accept=".parquet" required aria-describedby="transactionsSchema transactionsSelection">
+            <span id="transactionsSelection" class="file-selection">Файл не выбран</span>
+            <code id="transactionsSchema">src · dst · date · sum_kzt</code>
+          </label>
+        </fieldset>
+        <p class="upload-limits">До 20 МБ на файл · до 10 000 узлов, 30 000 связей и 100 000 транзакций. Все три таблицы должны относиться к одной сети; их названия на диске могут отличаться.</p>
+        <div class="upload-assumption"><span aria-hidden="true">ⓘ</span><p>Методика рассчитана на исходящий четырёхшаговый обход, с границей наблюдения на depth = 4 и отсечением переводов ниже 5 000 KZT. Для другой схемы сбора нужны изменения методики.</p></div>
+        <div id="uploadError" class="error-banner hidden" role="alert" tabindex="-1"></div>
+        <section id="uploadProgress" class="upload-progress hidden" aria-live="polite" aria-atomic="true">
+          <div class="progress-heading"><span class="progress-spinner" aria-hidden="true"></span><strong id="progressTitle">Подготовка анализа</strong><span id="progressElapsed">0 сек.</span></div>
+          <p id="progressMessage">Файлы отправляются на локальный сервер…</p>
+          <div class="progress-track" role="progressbar" aria-label="Анализ набора данных"><span></span></div>
+          <p id="progressNote" class="progress-note">Не закрывайте страницу. Панель откроется автоматически после завершения расчёта.</p>
+        </section>
+        <div class="upload-actions">
+          <p id="fileSummary">Выберите все три файла, чтобы продолжить.</p>
+          <button id="resumeStatus" type="button" class="button secondary hidden">Проверить готовность</button>
+          <button id="uploadSubmit" type="submit" class="button" disabled>Загрузить и открыть анализ <span aria-hidden="true">↗</span></button>
+        </div>
+      </form>
+    </section>
+
+    <section class="current-dataset panel" aria-labelledby="current-title">
+      <div><p class="eyebrow">УЖЕ ЕСТЬ В ПРОЕКТЕ</p><h3 id="current-title">Открыть исходный набор</h3><p id="currentDatasetSummary">Проверяем готовность сохранённого анализа…</p></div>
+      <a id="openCurrent" class="button secondary hidden" href="/dashboard?run=default">Открыть готовую панель →</a>
+    </section>
+    <footer class="upload-footer"><p>Результат: <code>nodes_roles.csv</code>, <code>clusters.csv</code>, <code>top_nodes.csv</code></p><p>Роли — гипотезы для аналитика, не выводы о виновности. Загрузка и расчёт не вызывают внешние AI-сервисы.</p></footer>
+  </main>
+  <script src="/upload.js"></script>
+</body>
+</html>

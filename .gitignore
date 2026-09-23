@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+.venv-ai/
+.deps/
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+tmp/
+runtime/
+**/__MACOSX/

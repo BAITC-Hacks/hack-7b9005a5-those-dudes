@@ -1,0 +1,78 @@
+.upload-workspace { width: min(1140px, calc(100% - 64px)); margin: 52px auto 28px; }
+.upload-intro { max-width: 870px; }
+.upload-intro h2 { margin: 0 0 12px; font-size: clamp(1.9rem, 3.8vw, 2.8rem); line-height: 1.15; letter-spacing: -.035em; }
+.upload-intro > p:not(.eyebrow) { max-width: 760px; color: var(--muted); font-size: 1rem; }
+.upload-steps { display: flex; gap: 32px; padding: 0; margin: 28px 0; list-style: none; color: var(--muted); font-size: .82rem; }
+.upload-steps li { display: flex; align-items: center; gap: 10px; }
+.upload-steps span { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 50%; font-size: .65rem; }
+.upload-steps .active { color: var(--text); }
+.upload-steps .active span { border-color: var(--cyan); color: var(--cyan); background: var(--cyan-soft); }
+.upload-panel { padding: 24px; }
+.upload-panel .panel-title-row { margin-bottom: 22px; }
+.upload-fields { padding: 0; margin: 0; border: 0; min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.file-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 21px 18px; background: rgba(8, 21, 30, .6); border: 1px dashed var(--border-bright); border-radius: 10px; cursor: pointer; transition: background .15s, border-color .15s; }
+.file-card:hover, .file-card:focus-within { border-color: var(--cyan); background: rgba(56, 225, 198, .035); }
+.file-card.has-file { border-style: solid; border-color: #28756c; background: rgba(56, 225, 198, .045); }
+.file-number { color: var(--cyan); letter-spacing: .1em; font-size: .66rem; }
+.file-card > strong { font-size: 1.03rem; font-weight: 600; }
+.file-description { color: var(--muted); font-size: .79rem; min-height: 2.5em; }
+.file-card input[type=file] { width: 100%; color: transparent; font-size: 0; cursor: pointer; height: 37px; }
+.file-card input[type=file]::file-selector-button { height: 37px; border: 1px solid var(--border-bright); border-radius: 6px; padding: 7px 12px; font-family: inherit; font-weight: 500; font-size: .79rem; color: var(--text); background: var(--surface-2); cursor: pointer; }
+.file-card input:disabled, .file-card input:disabled::file-selector-button { cursor: wait; opacity: .65; }
+.file-card code { font-size: .62rem; line-height: 1.8; color: var(--faint); overflow-wrap: anywhere; }
+.file-selection { color: var(--muted); font-size: .72rem; min-height: 2.8em; overflow-wrap: anywhere; }
+.has-file .file-selection { color: var(--cyan); }
+.upload-limits { color: var(--muted); font-size: .74rem; margin: 16px 0; max-width: 900px; }
+.upload-assumption { display: flex; align-items: flex-start; gap: 10px; border: 1px solid #3e3b2a; border-radius: 8px; padding: 11px 13px; background: rgba(255, 180, 84, .035); }
+.upload-assumption > span { color: var(--amber); }
+.upload-assumption p { margin: 0; font-size: .75rem; color: #b9ad99; }
+.upload-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.upload-actions > p { margin: 0 auto 0 0; font-size: .76rem; color: var(--muted); }
+.upload-actions .button { white-space: nowrap; }
+.upload-actions .button > span { margin-left: 12px; }
+.upload-progress { padding: 18px; margin-top: 22px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; }
+.progress-heading { display: flex; align-items: center; gap: 10px; }
+.progress-heading > strong { font-size: .85rem; }
+.progress-heading > span:last-child { margin-left: auto; color: var(--muted); font-size: .73rem; }
+.progress-spinner { width: 15px; height: 15px; border: 2px solid var(--border-bright); border-top-color: var(--cyan); border-radius: 50%; animation: upload-spin 1s linear infinite; }
+.upload-progress p { margin: 9px 0 12px; color: var(--muted); font-size: .8rem; }
+.progress-track { overflow: hidden; height: 4px; background: var(--border); border-radius: 2px; }
+.progress-track span { display: block; width: 30%; height: 100%; background: var(--cyan); animation: upload-progress 2s ease-in-out infinite alternate; }
+.upload-progress .progress-note { margin: 10px 0 0; font-size: .7rem; }
+.upload-progress.paused .progress-spinner, .upload-progress.paused .progress-track span { animation-play-state: paused; }
+.current-dataset { margin-top: 20px; padding: 21px 24px; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.current-dataset .eyebrow { font-size: .61rem; margin: 0 0 6px; }
+.current-dataset h3 { font-size: .95rem; margin: 0 0 4px; }
+.current-dataset p:last-child { font-size: .76rem; color: var(--muted); margin: 0; }
+.current-dataset .button { font-size: .79rem; white-space: nowrap; }
+.upload-footer { display: flex; justify-content: space-between; gap: 22px; color: var(--faint); font-size: .69rem; padding: 12px 3px; }
+.upload-footer p { max-width: 510px; }
+.upload-footer code { font-size: .66rem; color: var(--muted); }
+#uploadError { margin-top: 18px; white-space: pre-line; }
+@keyframes upload-spin { to { transform: rotate(360deg); } }
+@keyframes upload-progress { from { transform: translateX(-40%); } to { transform: translateX(275%); } }
+@media (max-width: 900px) {
+  .upload-workspace { width: calc(100% - 32px); margin-top: 32px; }
+  .upload-panel { padding: 18px; }
+  .upload-fields { gap: 10px; }
+  .file-card { padding: 16px 12px; }
+  .file-card > strong { font-size: .86rem; }
+  .upload-actions { flex-wrap: wrap; }
+  .upload-actions > p { flex-basis: 100%; }
+  .upload-footer { flex-direction: column; gap: 0; }
+  .upload-footer p { margin: 8px 0 0; }
+}
+@media (max-width: 640px) {
+  .upload-workspace { width: calc(100% - 24px); margin-top: 26px; }
+  .upload-fields { grid-template-columns: 1fr; }
+  .file-card { gap: 9px; padding: 18px; }
+  .file-description, .file-selection { min-height: 0; }
+  .upload-steps { gap: 12px; font-size: .63rem; justify-content: space-between; }
+  .upload-steps li { flex-direction: column; gap: 7px; align-items: flex-start; }
+  .upload-actions .button { width: 100%; }
+  .current-dataset { align-items: stretch; flex-direction: column; padding: 20px; }
+  .current-dataset .button { text-align: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-spinner, .progress-track span { animation: none; }
+}

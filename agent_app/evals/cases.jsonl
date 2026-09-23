@@ -1,0 +1,7 @@
+{"id":"health","request":{"action":"health"},"expect":{"status":"ok","data_keys":["nodes","edges","transactions","pipeline_ready"]}}
+{"id":"top_candidates","request":{"action":"top_candidates","limit":5},"expect":{"status":"ok","data_keys":["candidates"],"max_items":{"key":"candidates","value":5}}}
+{"id":"uncertain_nodes","request":{"action":"uncertain_nodes","limit":7},"expect":{"status":"ok","data_keys":["nodes"],"max_items":{"key":"nodes","value":7}}}
+{"id":"resilience","request":{"action":"resilience_summary"},"expect":{"status":"ok","data_keys":["scenarios"]}}
+{"id":"depth4_censoring","selector":"first_depth4","request":{"action":"node_profile"},"expect":{"status":"ok","data_keys":["gid","sampling"],"warning_contains":"правоцензурирован"}}
+{"id":"compare_top_pair","selector":"top_pair","request":{"action":"compare_nodes"},"expect":{"status":"ok","data_keys":["nodes"],"max_items":{"key":"nodes","value":2}}}
+{"id":"missing_gid","request":{"action":"node_profile","gid":"999999999999999999"},"expect":{"status":"not_found","data_keys":["gid"]}}

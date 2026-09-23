@@ -1,0 +1,59 @@
+{
+  "generated_at": "2026-09-23T09:42:46.768995+00:00",
+  "mode": "offline",
+  "api_called": false,
+  "total": 7,
+  "passed": 7,
+  "failed": 0,
+  "cases": [
+    {
+      "id": "health",
+      "passed": true,
+      "failures": [],
+      "status": "ok",
+      "action": "health"
+    },
+    {
+      "id": "top_candidates",
+      "passed": true,
+      "failures": [],
+      "status": "ok",
+      "action": "top_candidates"
+    },
+    {
+      "id": "uncertain_nodes",
+      "passed": true,
+      "failures": [],
+      "status": "ok",
+      "action": "uncertain_nodes"
+    },
+    {
+      "id": "resilience",
+      "passed": true,
+      "failures": [],
+      "status": "ok",
+      "action": "resilience_summary"
+    },
+    {
+      "id": "depth4_censoring",
+      "passed": true,
+      "failures": [],
+      "status": "ok",
+      "action": "node_profile"
+    },
+    {
+      "id": "compare_top_pair",
+      "passed": true,
+      "failures": [],
+      "status": "ok",
+      "action": "compare_nodes"
+    },
+    {
+      "id": "missing_gid",
+      "passed": true,
+      "failures": [],
+      "status": "not_found",
+      "action": "node_profile"
+    }
+  ]
+}

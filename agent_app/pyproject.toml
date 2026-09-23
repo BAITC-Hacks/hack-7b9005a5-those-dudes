@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hackalem-agent-app"
+version = "0.1.0"
+description = "Explainable local AML graph investigation assistant"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas>=2.2,<4",
+  "pyarrow>=18,<23",
+  "python-dotenv>=1.0,<2",
+]
+
+[project.optional-dependencies]
+llm = ["openai-agents>=0.4"]
+test = ["pytest>=8,<10"]
+
+[project.scripts]
+hackalem-agent = "agent_app.main:main"
+
+[tool.setuptools]
+packages = ["agent_app"]
+
+[tool.setuptools.package-dir]
+agent_app = "."
+
+[tool.setuptools.package-data]
+agent_app = ["docs/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
