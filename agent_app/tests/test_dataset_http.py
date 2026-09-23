@@ -3,11 +3,13 @@ from functools import partial
 from http.server import ThreadingHTTPServer
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 from threading import Thread
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 import zipfile
@@ -145,6 +147,28 @@ class DatasetHTTPTests(unittest.TestCase):
         self.assertEqual(self.upload(headers={"Origin": "https://other.example"})[0], 403)
         self.assertEqual(self.upload(headers={"X-HackAlem-Action": ""})[0], 403)
         self.assertEqual(self.upload(headers={"Sec-Fetch-Site": "cross-site"})[0], 403)
+
+    def test_render_https_upload_accepts_only_the_public_origin(self):
+        public = "https://hackalem.onrender.com"
+        with patch.dict(os.environ, {"PUBLIC_ORIGIN": "", "RENDER_EXTERNAL_URL": public}):
+            self.assertEqual(self.upload(headers={"Origin": public})[0], 202)
+            self.assertEqual(self.upload(headers={"Origin": self.base})[0], 403)
+            self.assertEqual(self.upload(headers={"Origin": public + ".evil.example"})[0], 403)
+            self.assertEqual(self.upload(headers={"Origin": public, "Sec-Fetch-Site": "cross-site"})[0], 403)
+            self.assertEqual(self.upload(headers={"Origin": public, "X-HackAlem-Action": ""})[0], 403)
+
+    def test_custom_public_origin_overrides_render_url(self):
+        with patch.dict(os.environ, {"PUBLIC_ORIGIN": "https://graph.example/",
+                                    "RENDER_EXTERNAL_URL": "https://hackalem.onrender.com"}):
+            self.assertEqual(self.upload(headers={"Origin": "https://graph.example"})[0], 202)
+            self.assertEqual(self.upload(headers={"Origin": "https://hackalem.onrender.com"})[0], 403)
+
+    def test_forwarding_headers_cannot_authorize_a_foreign_origin(self):
+        with patch.dict(os.environ, {"PUBLIC_ORIGIN": "", "RENDER_EXTERNAL_URL": ""}):
+            self.assertEqual(self.upload(headers={"Origin": "https://evil.example",
+                                                  "X-Forwarded-Host": "evil.example",
+                                                  "X-Forwarded-Proto": "https"})[0], 403)
+            self.assertEqual(self.upload()[0], 202)
 
     def test_malformed_multipart_returns_json_error(self):
         code, headers, _ = self.request("/api/datasets", b"garbage", {

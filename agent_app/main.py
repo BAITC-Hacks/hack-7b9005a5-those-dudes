@@ -157,9 +157,14 @@ class AssistantHandler(SimpleHTTPRequestHandler):
 
     def _same_origin_action(self, action: str) -> bool:
         origin = self.headers.get("Origin")
+        # TLS terminates at Render's proxy. Use the configured public origin,
+        # never client-supplied forwarding headers, for browser action checks.
+        expected_origin = (os.environ.get("PUBLIC_ORIGIN")
+                           or os.environ.get("RENDER_EXTERNAL_URL")
+                           or f"http://{self.headers.get('Host')}").rstrip("/")
         return (self.headers.get("X-HackAlem-Action") == action
                 and self.headers.get("Sec-Fetch-Site") != "cross-site"
-                and (not origin or origin == f"http://{self.headers.get('Host')}"))
+                and (not origin or origin == expected_origin))
 
     def _upload(self) -> None:
         if self.datasets is None:

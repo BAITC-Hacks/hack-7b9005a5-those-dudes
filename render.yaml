@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+services:
+  - type: web
+    name: hackalem-those-dudes
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && python run_project.py --no-server
+    startCommand: python run_project.py --skip-pipeline --skip-dashboard --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: OPENAI_AGENTS_DISABLE_TRACING
+        value: "1"
