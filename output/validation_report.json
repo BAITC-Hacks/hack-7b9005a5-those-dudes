@@ -1,6 +1,7 @@
 {
   "passed": true,
   "schema_and_invariants": {
+    "fixed_csv_contract": true,
     "nodes_row_count_matches_input": true,
     "nodes_unique_gid": true,
     "nodes_gid_set_matches_input": true,
@@ -12,7 +13,7 @@
     "clusters_mandatory_columns": true,
     "all_nodes_have_cluster": true,
     "top_mandatory_columns": true,
-    "top_has_at_least_20": true,
+    "top_has_at_least_20_or_all_available_nodes": true,
     "top_sorted_descending": true,
     "no_missing_mandatory_values": true
   },

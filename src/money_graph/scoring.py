@@ -6,14 +6,8 @@ import numpy as np
 import pandas as pd
 
 
-ROLES = (
-    "consolidator",
-    "transit",
-    "distributor",
-    "terminal",
-    "coordinator",
-    "peripheral",
-)
+from .rules import ROLES, add_role_profiles, decision_trace, profile_formula
+from .narration import role_evidence as _role_evidence
 
 
 def signal_percentile(series: pd.Series) -> pd.Series:
@@ -217,84 +211,12 @@ def role_and_priority_scores(
         .mean(axis=1)
     )
 
-    frame["score_consolidator"] = (
-        0.25 * frame["p_in_deg"]
-        + 0.20 * frame["p_in_tx"]
-        + 0.20 * frame["p_in_kzt"]
-        + 0.15 * frame["p_authority"]
-        + 0.20 * frame["retention"].clip(0.0, 1.0)
-    )
-    frame["score_transit"] = (
-        0.30 * frame["fifo_1d"].fillna(0.0).clip(0.0, 1.0)
-        + 0.20 * frame["balance_similarity"].clip(0.0, 1.0)
-        + 0.20 * frame["p_brokerage"]
-        + 0.15 * frame["p_total_tx"]
-        + 0.15 * frame["p_repeat_route"]
-    )
-    frame["score_distributor"] = (
-        0.25 * frame["p_out_deg"]
-        + 0.20 * frame["p_out_tx"]
-        + 0.20 * frame["p_out_kzt"]
-        + 0.15 * frame["p_hub"]
-        + 0.20 * frame["max_out_targets_day"].gt(0).astype(float) * frame["p_sync_out"]
-    )
-    frame["score_terminal"] = (
-        0.35 * frame["retention"].clip(0.0, 1.0)
-        + 0.25 * frame["p_in_kzt"]
-        + 0.15 * frame["p_in_tx"]
-        + 0.15 * frame["p_authority"]
-        + 0.10 * (1.0 - frame["p_continue"])
-    )
-    frame["score_coordinator"] = (
-        0.25 * frame["p_brokerage"]
-        + 0.20 * frame["p_seed_affinity"]
-        + 0.20 * frame["p_participation"]
-        + 0.15 * frame[["p_pagerank_amount", "p_pagerank_count"]].mean(axis=1)
-        + 0.20 * motif
-    )
+    add_role_profiles(frame)
     nonperipheral_columns = [f"score_{role}" for role in ROLES if role != "peripheral"]
-    frame["score_peripheral"] = (1.0 - frame[nonperipheral_columns].max(axis=1)).clip(0.05, 1.0)
 
-    coordinator_signals = pd.concat(
-        [
-            frame["p_brokerage"],
-            frame["p_seed_affinity"],
-            frame["p_participation"],
-            frame[["p_pagerank_amount", "p_pagerank_count"]].mean(axis=1),
-            motif,
-        ],
-        axis=1,
-    )
-    sinks = (frame["in_deg"] > 0) & (frame["out_deg"] == 0) & nonseed
-    lower_terminal = sinks & (frame["depth"] < 4)
-    censored_terminal = (
-        sinks
-        & frame["truncated_by_depth"].astype(bool)
-        & (frame["p_continue"] <= thresholds["terminal_continue_allow"])
-    )
-    gates = pd.DataFrame(
-        {
-            "consolidator": nonseed
-            & (frame["in_deg"] >= in_degree_gate)
-            & (frame["in_flow_share"] >= thresholds["flow_share_gate"]),
-            "transit": nonseed
-            & (frame["in_deg"] > 0)
-            & (frame["out_deg"] > 0)
-            & (
-                (frame["fifo_1d"] >= thresholds["fifo_transit"])
-                | (frame["balance_similarity"] >= thresholds["fifo_transit"])
-            ),
-            "distributor": (frame["out_deg"] >= out_degree_gate)
-            & (frame["out_flow_share"] >= thresholds["flow_share_gate"]),
-            "terminal": (lower_terminal | censored_terminal)
-            & (frame["in_kzt"] >= thresholds["in_kzt_median_positive_nonseed"]),
-            "coordinator": (coordinator_signals.ge(thresholds["coordinator_rank_gate"]).sum(axis=1) >= 3)
-            & ((frame["p_brokerage"] >= 0.90) | (frame["p_participation"] >= 0.90))
-            & (frame["score_coordinator"] >= thresholds["coordinator_score_gate"]),
-            "peripheral": True,
-        },
-        index=frame.index,
-    )
+    rule_metadata = {"thresholds": thresholds, "integer_gates": {"in_degree": in_degree_gate, "out_degree": out_degree_gate}}
+    traces = [decision_trace(row, rule_metadata) for row in frame.to_dict("records")]
+    gates = pd.DataFrame([{role: trace["roles"][role]["eligible"] for role in ROLES} for trace in traces], index=frame.index)
 
     score_columns = [f"score_{role}" for role in ROLES]
     raw_scores = frame[score_columns].to_numpy(dtype=float)
@@ -419,6 +341,8 @@ def role_and_priority_scores(
     frame["evidence"] = [_role_evidence(row) for _, row in frame.iterrows()]
     metadata: dict[str, object] = {
         "roles": list(ROLES),
+        "profile_formulas": {role: profile_formula(role) for role in ROLES if role != "peripheral"},
+        "rules_source": "money_graph.rules.decision_trace",
         "thresholds": thresholds,
         "integer_gates": {"in_degree": in_degree_gate, "out_degree": out_degree_gate},
         "role_score_formula": "observability*(0.45*profile+0.30*min(1,margin/0.25)+0.25*score_perturbation_stability)",
@@ -428,45 +352,3 @@ def role_and_priority_scores(
         "continuation_model": continuation.metadata,
     }
     return frame, metadata
-
-
-def _role_evidence(row: pd.Series) -> str:
-    role = str(row["role"])
-    if role == "consolidator":
-        text = (
-            f"вход={int(row.in_deg)} источн./{int(row.in_tx)} tx/{row.in_kzt:.0f} KZT; "
-            f"удержание={row.retention:.2f}; authority p={row.p_authority:.2f}"
-        )
-    elif role == "transit":
-        ratio = row.pass_through if pd.notna(row.pass_through) else 0.0
-        text = (
-            f"FIFO<=1д={row.fifo_1d:.0%}; out/in={ratio:.2f}; лаг={row.median_fifo_lag if pd.notna(row.median_fifo_lag) else -1:.0f}д; "
-            f"broker p={row.p_brokerage:.2f}"
-        )
-    elif role == "distributor":
-        text = (
-            f"выход={int(row.out_deg)} получ./{int(row.out_tx)} tx/{row.out_kzt:.0f} KZT; "
-            f"max/day={int(row.max_out_targets_day)}; hub p={row.p_hub:.2f}"
-        )
-    elif role == "terminal":
-        if bool(row.truncated_by_depth):
-            text = (
-                f"depth=4 censored; p_continue={row.p_continue:.2f}; вход={row.in_kzt:.0f} KZT/{int(row.in_tx)} tx; "
-                "confidence<=0.60"
-            )
-        else:
-            text = (
-                f"наблюдаемый sink depth={int(row.depth)}; вход={row.in_kzt:.0f} KZT/{int(row.in_tx)} tx; "
-                f"удержание={row.retention:.2f}"
-            )
-    elif role == "coordinator":
-        text = (
-            f"seed direct={int(row.direct_seed_in)}, seed p={row.p_seed_affinity:.2f}; "
-            f"broker p={row.p_brokerage:.2f}; clusters={int(row.clusters_touched)}; sync={max(int(row.max_in_sources_day), int(row.max_out_targets_day))}"
-        )
-    else:
-        text = (
-            f"слабый профиль: in/out deg={int(row.in_deg)}/{int(row.out_deg)}, оборот={row.total_kzt:.0f} KZT; "
-            f"лучший={row.secondary_role}:{row.get('score_' + str(row.secondary_role), 0.0):.2f}"
-        )
-    return text[:200]

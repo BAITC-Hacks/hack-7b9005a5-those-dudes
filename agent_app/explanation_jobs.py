@@ -42,7 +42,9 @@ SAFE_EXCEPTION_TYPES = frozenset({"ModelBehaviorError", "AgentsException", "MaxT
 DIAGNOSTIC_FIELDS = frozenset({"role_summary", "priority_summary", "explanation", "priority_explanation",
                                "alternative_explanation", "analyst_next_step", "evidence_interpretation",
                                "evidence_items.interpretation", "limitations", "prose"})
-DIAGNOSTIC_RULES = frozenset({"string_required", "length_out_of_bounds", "numeric_literal_forbidden"})
+DIAGNOSTIC_RULES = frozenset({"string_required", "length_out_of_bounds", "numeric_literal_forbidden",
+                              "word_limit_exceeded", "unknown_fact_reference", "invalid_fact_placeholder",
+                              "insufficient_fact_references"})
 
 
 def _json(value: Any) -> str:
@@ -71,7 +73,8 @@ def _csv_safe(value: str) -> str:
 def _result_valid(result: Any) -> bool:
     if not isinstance(result, dict) or any(not isinstance(result.get(name), str) or not result[name].strip() for name in TEXT_FIELDS):
         return False
-    if len(result["evidence"]) > 200 or len(result["why"]) > 200:
+    if any(provider.narrative_word_count(result[name]) > provider.MAX_NARRATIVE_WORDS
+           or "{{" in result[name] or "}}" in result[name] for name in ("evidence", "why")):
         return False
     try:
         return isinstance(json.loads(result["evidence_json"]), (dict, list))

@@ -136,8 +136,13 @@ class AssistantHandler(SimpleHTTPRequestHandler):
         elif len(parts) == 5 and parts[4] == "dashboard_data.js":
             self._send_file(self.datasets.asset(parts[3], parts[4]), "text/javascript; charset=utf-8")
         elif len(parts) == 6 and parts[4] == "exports":
+            modes = parse_qs(urlparse(self.path).query).get("mode", ["extended"])
+            if len(modes) != 1 or modes[0] not in {"extended", "contest"}:
+                raise DatasetError("Неизвестный режим выгрузки.", 400)
+            contest = modes[0] == "contest"
             if parts[5] == "results.zip":
-                payload = self.narratives.archive(parts[3]) if self.narratives else self.datasets.archive(parts[3])
+                payload = (self.datasets.competition_archive(parts[3]) if contest else
+                           self.narratives.archive(parts[3]) if self.narratives else self.datasets.archive(parts[3]))
                 self.send_response(200)
                 self.send_header("Content-Type", "application/zip")
                 self.send_header("Content-Length", str(len(payload)))
@@ -149,7 +154,8 @@ class AssistantHandler(SimpleHTTPRequestHandler):
             else:
                 if parts[5] not in EXPORT_NAMES:
                     raise DatasetError("Файл выгрузки не найден.", 404)
-                path = (self.narratives.export_file(parts[3], parts[5]) if self.narratives
+                path = (self.datasets.competition_asset(parts[3], parts[5]) if contest else
+                        self.narratives.export_file(parts[3], parts[5]) if self.narratives
                         else self.datasets.asset(parts[3], parts[5]))
                 self._send_file(path, "text/csv; charset=utf-8", download=True)
         else:

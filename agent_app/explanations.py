@@ -42,37 +42,7 @@ def _number(value: Any) -> float | None:
         return None
 
 
-def decision_trace(row: dict, metadata: dict) -> dict:
-    """Mirror gates in scoring.py for explanation only; never assign new roles."""
-    t = metadata.get("thresholds", {})
-    degree = metadata.get("integer_gates", {})
-    required = ("is_seed", "depth", "in_deg", "out_deg", "in_kzt", "in_flow_share", "out_flow_share",
-                "fifo_1d", "balance_similarity", "truncated_by_depth", "p_continue",
-                "p_brokerage", "p_seed_affinity", "p_participation", "p_pagerank_amount",
-                "p_pagerank_count", "p_sync_in", "p_sync_out", "p_repeat_route", "p_reciprocal", "p_cycle")
-    thresholds = ("flow_share_gate", "fifo_transit", "coordinator_rank_gate", "coordinator_score_gate",
-                  "terminal_continue_allow", "in_kzt_median_positive_nonseed")
-    if not all(_number(row.get(key)) is not None for key in required) or not all(key in t for key in thresholds) or not all(key in degree for key in ("in_degree", "out_degree")):
-        return {"available": False, "reason": "Полные признаки или пороги не сохранены."}
-    n = lambda key: float(row[key])
-    check = lambda name, observed, op, threshold, passed: {"condition": name, "observed": observed, "operator": op, "threshold": threshold, "passed": bool(passed)}
-    nonseed = check("is_seed", bool(row["is_seed"]), "=", False, not row["is_seed"])
-    motif = sum(n(key) for key in ("p_sync_in", "p_sync_out", "p_repeat_route", "p_reciprocal", "p_cycle")) / 5
-    signals = [n("p_brokerage"), n("p_seed_affinity"), n("p_participation"), (n("p_pagerank_amount") + n("p_pagerank_count")) / 2, motif]
-    high_signals = sum(value >= t["coordinator_rank_gate"] for value in signals)
-    terminal_observed = n("depth") < 4 or (bool(row["truncated_by_depth"]) and n("p_continue") <= t["terminal_continue_allow"])
-    gates = {
-        "consolidator": [nonseed, check("in_deg", n("in_deg"), ">=", degree["in_degree"], n("in_deg") >= degree["in_degree"]), check("in_flow_share", n("in_flow_share"), ">=", t["flow_share_gate"], n("in_flow_share") >= t["flow_share_gate"])],
-        "transit": [nonseed, check("in_deg", n("in_deg"), ">", 0, n("in_deg") > 0), check("out_deg", n("out_deg"), ">", 0, n("out_deg") > 0), check("max(fifo_1d,balance_similarity)", max(n("fifo_1d"), n("balance_similarity")), ">=", t["fifo_transit"], max(n("fifo_1d"), n("balance_similarity")) >= t["fifo_transit"])],
-        "distributor": [check("out_deg", n("out_deg"), ">=", degree["out_degree"], n("out_deg") >= degree["out_degree"]), check("out_flow_share", n("out_flow_share"), ">=", t["flow_share_gate"], n("out_flow_share") >= t["flow_share_gate"])],
-        "terminal": [nonseed, check("in_deg", n("in_deg"), ">", 0, n("in_deg") > 0), check("out_deg", n("out_deg"), "=", 0, n("out_deg") == 0), check("depth<4 OR (censored AND p_continue<=threshold)", {"depth": n("depth"), "p_continue": n("p_continue"), "censored": bool(row["truncated_by_depth"])}, "rule", t["terminal_continue_allow"], terminal_observed), check("in_kzt", n("in_kzt"), ">=", t["in_kzt_median_positive_nonseed"], n("in_kzt") >= t["in_kzt_median_positive_nonseed"])],
-        "coordinator": [check("signals >= rank gate", high_signals, ">=", 3, high_signals >= 3), check("max(p_brokerage,p_participation)", max(n("p_brokerage"), n("p_participation")), ">=", .9, max(n("p_brokerage"), n("p_participation")) >= .9), check("score_coordinator", _number(row.get("score_coordinator")), ">=", t["coordinator_score_gate"], (_number(row.get("score_coordinator")) or 0) >= t["coordinator_score_gate"])],
-        "peripheral": [],
-    }
-    return {"available": True, "selection_rule": "maximum profile_score among eligible roles; ties follow saved role order", "role_order": list(ROLES),
-            "roles": {role: {"eligible": all(item["passed"] for item in checks), "profile_score": _number(row.get(f"score_{role}")), "conditions": checks} for role, checks in gates.items()},
-            "coordinator_rank_gate": t["coordinator_rank_gate"], "coordinator_signals": signals,
-            "role_score_formula": metadata.get("role_score_formula")}
+from money_graph.rules import decision_trace
 
 
 class RoleExplanationService:

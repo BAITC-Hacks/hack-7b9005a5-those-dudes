@@ -569,10 +569,16 @@ class InvestigationEngine:
         )
 
     def top_candidates(
-        self, role: str | None = None, limit: int = 20
+        self, role: str | None = None, limit: int = 20, min_fifo_1d: float | None = None
     ) -> dict[str, Any]:
         limit = _bounded(limit, 1, 100)
         frame = self.store.roles.copy()
+        if min_fifo_1d is not None:
+            if not isinstance(min_fifo_1d, (int, float)) or not 0 <= min_fifo_1d <= 1:
+                return self._response("top_candidates", "min_fifo_1d должен быть числом от 0 до 1.", status="invalid_request")
+            if "fifo_1d" not in frame:
+                return self._response("top_candidates", "Временные признаки не рассчитаны.", status="unavailable")
+            frame = frame[pd.to_numeric(frame["fifo_1d"], errors="coerce") >= min_fifo_1d]
         if role:
             role = role.strip().lower()
             if "role" not in frame.columns:
@@ -601,6 +607,7 @@ class InvestigationEngine:
                 "evidence",
                 "uncertainty_reason",
                 "truncated_by_depth",
+                "fifo_1d",
             )
             if column in frame.columns
         ]
@@ -609,7 +616,7 @@ class InvestigationEngine:
         return self._response(
             "top_candidates",
             f"Показано {len(result)} кандидатов{label}, ранжированных по investigative priority, а не по виновности.",
-            {"role_filter": role, "candidates": result, "total_matching": len(frame)},
+            {"role_filter": role, "min_fifo_1d": min_fifo_1d, "candidates": result, "total_matching": len(frame)},
         )
 
     def uncertain_nodes(self, limit: int = 20) -> dict[str, Any]:
@@ -726,7 +733,7 @@ class InvestigationEngine:
         if action in {"cluster", "cluster_summary"}:
             return self.cluster_summary(request.get("cluster_id", ""))
         if action in {"top", "top_candidates"}:
-            return self.top_candidates(request.get("role"), _int(request.get("limit"), 20))
+            return self.top_candidates(request.get("role"), _int(request.get("limit"), 20), request.get("min_fifo_1d"))
         if action in {"uncertain", "uncertain_nodes"}:
             return self.uncertain_nodes(_int(request.get("limit"), 20))
         if action in {"resilience", "resilience_summary"}:
@@ -743,7 +750,7 @@ class InvestigationEngine:
 
         text = str(question or "").strip()
         lowered = text.lower()
-        gids = re.findall(r"(?<!\d)\d{8,}(?!\d)", text)
+        gids = list(dict.fromkeys(re.findall(r"(?<!\d)\d{8,}(?!\d)", text)))
         limit_match = re.search(r"(?:топ|top|limit)\s*[:=]?\s*(\d{1,3})", lowered)
         limit = _bounded(int(limit_match.group(1)), 1, 100) if limit_match else 20
 
@@ -753,6 +760,12 @@ class InvestigationEngine:
                 "Введите вопрос или используйте структурированный action.",
                 status="invalid_request",
             )
+        if len(gids) >= 2:
+            if any(token in lowered for token in ("общ", "common recipient", "собира", "сбор", "получает от", "получател", "collect")):
+                return self.common_recipients(gids, limit)
+            if any(token in lowered for token in ("сравн", "compare", "различ")):
+                return self.compare_nodes(gids)
+            return self._response("offline_query", "Указано несколько gid. Найти общих получателей или сравнить все эти узлы? Ни один идентификатор не отброшен.", {"gids": gids}, status="needs_clarification")
         if any(token in lowered for token in ("health", "готов", "статус данных")):
             return self.health()
         if any(token in lowered for token in ("устойчив", "resilien", "удален")):
@@ -775,14 +788,25 @@ class InvestigationEngine:
             return self.neighbors(gids[0], direction, limit)
         if any(token in lowered for token in ("почему", "объяс", "priority", "приоритет")) and gids:
             return self.explain_priority(gids[0])
-        if any(token in lowered for token in ("топ", "top", "кандидат", "приоритет")):
+        role = next((role for role in ROLE_LABELS if role in lowered), None)
+        if role is None:
+            role = next((mapped for stem, mapped in ROLE_QUERY_STEMS.items() if stem in lowered), None)
+        if not gids and (role or any(token in lowered for token in ("топ", "top", "кандидат", "приоритет"))):
             role = next((role for role in ROLE_LABELS if role in lowered), None)
             if role is None:
                 role = next(
                     (mapped for stem, mapped in ROLE_QUERY_STEMS.items() if stem in lowered),
                     None,
                 )
-            return self.top_candidates(role, limit)
+            fifo = None
+            if "fifo" in lowered:
+                match = re.search(r"(?:не менее|>=|≥|at least)\s*(\d+(?:[.,]\d+)?)\s*(%)?", lowered)
+                if not match:
+                    return self._response("offline_query", "Уточните минимальную долю временного сопоставления, например FIFO не менее 80%.", status="needs_clarification")
+                fifo = float(match.group(1).replace(",", "."))
+                if match.group(2):
+                    fifo /= 100
+            return self.top_candidates(role, limit, fifo)
         if gids:
             return self.node_profile(gids[0])
         return self._response(

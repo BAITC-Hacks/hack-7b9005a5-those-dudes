@@ -7,6 +7,14 @@
     "coordinator",
     "peripheral"
   ],
+  "profile_formulas": {
+    "consolidator": "0.25*p_in_deg + 0.20*p_in_tx + 0.20*p_in_kzt + 0.15*p_authority + 0.20*retention",
+    "transit": "0.30*fifo_1d + 0.20*balance_similarity + 0.20*p_brokerage + 0.15*p_total_tx + 0.15*p_repeat_route",
+    "distributor": "0.25*p_out_deg + 0.20*p_out_tx + 0.20*p_out_kzt + 0.15*p_hub + 0.20*sync_out_present",
+    "terminal": "0.35*retention + 0.25*p_in_kzt + 0.15*p_in_tx + 0.15*p_authority + 0.10*no_continuation",
+    "coordinator": "0.25*p_brokerage + 0.20*p_seed_affinity + 0.20*p_participation + 0.15*pagerank_mean + 0.20*motif"
+  },
+  "rules_source": "money_graph.rules.decision_trace",
   "thresholds": {
     "in_degree_q95_positive_nonseed": 3.0,
     "out_degree_q90_positive_nonseed": 8.0,
@@ -85,14 +93,15 @@
   },
   "clustering": {
     "method": "louvain_symmetrized_amount_medoid",
+    "primary_weight": "amount_weight",
     "direction_tradeoff": "Louvain использует симметризованную проекцию; направленные признаки сохранены отдельно",
     "n_runs": 16,
     "random_seed": 42,
     "medoid_run": 13,
     "n_clusters": 89,
-    "pairwise_ari_median": 0.9194592040421743,
+    "pairwise_ari_median": 0.9180677228993267,
     "pairwise_ari_min": 0.8029877545282348,
-    "amount_vs_count_ari": 0.4353918176713035,
+    "amount_vs_count_ari": 0.4248718602960603,
     "optional_infomap_available": false,
     "optional_leiden_available": false,
     "optional_sbm_available": false,
@@ -101,7 +110,7 @@
   "motifs": {
     "n_reciprocal_pairs": 177,
     "n_cycles_length_2_6": 1541,
-    "n_temporally_ordered_cycles_7d": 187
+    "n_temporally_ordered_cycles_7d": 206
   },
   "sampling_constraints": [
     "four-hop outgoing-only crawl",

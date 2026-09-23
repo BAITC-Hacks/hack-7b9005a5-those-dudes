@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 from threading import Thread
 import unittest
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -123,6 +124,18 @@ class NarrativeHTTPTests(unittest.TestCase):
         self.assertEqual(self.request("/api/datasets/default/exports/results.zip")[0], 200)
         self.assertEqual(self.narratives.calls[-1], ("archive", "default"))
         self.assertFalse(any(call[0] == "start" for call in self.narratives.calls))
+
+    def test_contest_export_bypasses_narratives_and_validates_mode(self):
+        datasets = self.narratives.datasets
+        with patch.object(datasets, "competition_archive", return_value=b"contest zip", create=True) as archive:
+            self.assertEqual(self.request("/api/datasets/default/exports/results.zip?mode=contest"), (200, b"contest zip"))
+            archive.assert_called_once_with("default")
+        with patch.object(datasets, "competition_asset", return_value=self.directory / "nodes_roles.csv", create=True) as asset:
+            self.assertEqual(self.request("/api/datasets/default/exports/nodes_roles.csv?mode=contest")[0], 200)
+            asset.assert_called_once_with("default", "nodes_roles.csv")
+        self.assertEqual(self.request("/api/datasets/default/exports/results.zip?mode=bad")[0], 400)
+        self.assertEqual(self.request("/api/datasets/default/exports/results.zip?mode=contest&mode=extended")[0], 400)
+        self.assertEqual(self.narratives.calls, [])
 
 
 if __name__ == "__main__":

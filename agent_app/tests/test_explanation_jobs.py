@@ -12,7 +12,7 @@ from zipfile import ZipFile
 
 from agent_app.config import AISettings
 from agent_app.datasets import DatasetError
-from agent_app.explanation_jobs import NarrativeManager, TEXT_FIELDS
+from agent_app.explanation_jobs import NarrativeManager, TEXT_FIELDS, _result_valid
 
 
 IDS = ("100000000343175100", "100000003115284100", "9007199254740993")
@@ -111,6 +111,33 @@ class NarrativeJobsTest(unittest.TestCase):
         self.assertTrue(all(row["evidence"] == "rule-only" and row["evidence_rule"] == "rule-only" for row in exported))
         self.assertTrue(all(set(TEXT_FIELDS) <= set(row) for row in exported))
         self.generate.assert_not_called()
+
+    def test_two_hundred_word_paragraphs_survive_csv_and_zip_and_cache(self):
+        generated = answer()
+        for field in ("evidence", "why"):
+            generated[field] = " ".join(["Объяснение,"] * 199 + ['"проверить".'])
+        self.generate.return_value = generated
+        self.manager.start("default", scope="all")
+        self.finish()
+        self.assertEqual(self.manager.status("default")["generated_count"], 3)
+        reloaded = NarrativeManager(self.datasets)
+        for name in ("nodes_roles.csv", "top_nodes.csv"):
+            exported = rows(reloaded.export_file("default", name))
+            for row in exported:
+                for field in ("evidence", "why"):
+                    self.assertEqual(row[field], generated[field])
+                    self.assertEqual(len(row[field].split()), 200)
+            with ZipFile(BytesIO(reloaded.archive("default"))) as archive:
+                zipped = list(csv.DictReader(archive.read(name).decode("utf-8-sig").splitlines()))
+                self.assertEqual(zipped, exported)
+        self.assertEqual(self.generate.await_count, 3)
+
+    def test_cache_contract_rejects_overlong_or_unrendered_paragraphs(self):
+        for field in ("evidence", "why"):
+            for text in ("слово " * 201, "Не обработана ссылка {{metric.in_deg}}"):
+                generated = answer()
+                generated[field] = text
+                self.assertFalse(_result_valid(generated))
 
     def test_top_first_generation_and_enrichment_do_not_change_role_scores_or_source_files(self):
         before = {path.name: path.read_bytes() for path in self.datasets.output.iterdir()}

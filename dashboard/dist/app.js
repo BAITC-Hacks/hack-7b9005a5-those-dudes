@@ -494,10 +494,16 @@
         if (!query) return;
         const exact = nodeById.get(query);
         const node = exact || D.nodes.find(item => item.gid.includes(query));
+        search.setCustomValidity("");
+        $("#nodeSearchStatus").textContent = "";
         if (node) openNode(node.gid);
-        else search.setCustomValidity("gid не найден");
+        else {
+          search.setCustomValidity("gid не найден");
+          $("#nodeSearchStatus").textContent = "gid не найден в этом наборе. Предыдущая карточка закрыта.";
+          this.closeInspector();
+        }
       };
-      search.addEventListener("input", () => search.setCustomValidity(""));
+      search.addEventListener("input", () => { search.setCustomValidity(""); $("#nodeSearchStatus").textContent = ""; });
       search.addEventListener("search", executeSearch);
       search.addEventListener("keydown", event => { if (event.key === "Enter") executeSearch(); });
 
@@ -1104,8 +1110,11 @@
     if (location.protocol === "file:") setOffline("Открыто через file:// — API недоступен");
     else state.textContent = "API будет проверен при отправке";
 
+    let suggestedAction = null;
+    question.addEventListener("input", () => { suggestedAction = null; });
     $$("#aiSuggestions button").forEach(button => button.addEventListener("click", () => {
       question.value = button.dataset.prompt || "";
+      suggestedAction = button.dataset.action ? JSON.parse(button.dataset.action) : null;
       question.focus();
     }));
     question.addEventListener("keydown", event => {
@@ -1119,6 +1128,8 @@
       event.preventDefault();
       const query = question.value.trim();
       if (!query) { question.focus(); return; }
+      const action = suggestedAction;
+      suggestedAction = null;
       addAiMessage("user", "Вы", query);
       question.value = "";
       submit.disabled = true;
@@ -1134,10 +1145,10 @@
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 20_000);
       try {
-        const response = await fetch(apiUrl("/api/query"), {
+        const response = await fetch(apiUrl(action ? "/api/action" : "/api/query"), {
           method: "POST",
           headers: { "Content-Type": "application/json", "Accept": "application/json" },
-          body: JSON.stringify({ question: query }),
+          body: JSON.stringify(action || { question: query }),
           signal: controller.signal
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);

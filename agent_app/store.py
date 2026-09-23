@@ -18,6 +18,7 @@ SOURCE_ROOT = Path(__file__).resolve().parents[1] / "src"
 if str(SOURCE_ROOT) not in sys.path:
     sys.path.insert(0, str(SOURCE_ROOT))
 from money_graph.io import load_inputs
+from money_graph.contracts import extended_path
 
 
 ID_COLUMNS = ("gid", "src", "dst")
@@ -65,6 +66,7 @@ def _stringify_ids(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def _read_csv(path: Path, id_columns: tuple[str, ...] = ID_COLUMNS) -> pd.DataFrame:
+    path = extended_path(path)
     if not path.exists():
         return pd.DataFrame()
     header = pd.read_csv(path, nrows=0)

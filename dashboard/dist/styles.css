@@ -478,3 +478,5 @@ tr.clickable:hover td { background: rgba(56,225,198,.05); color: var(--text); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
 }
+
+#nodeSearchStatus:not(:empty) { display: block; color: #a82a25; max-width: 28rem; white-space: normal; font-size: .85rem; }

@@ -19,7 +19,9 @@ from typing import Any
 from .config import AISettings
 
 PROMPT_PATH = Path(__file__).parent / "docs" / "structured_explanation.md"
-PROMPT_VERSION = "structured-evidence-v5:" + hashlib.sha256(PROMPT_PATH.read_bytes()).hexdigest()[:16]
+PROMPT_VERSION = "structured-evidence-v6-human-200-words:" + hashlib.sha256(PROMPT_PATH.read_bytes()).hexdigest()[:16]
+MAX_NARRATIVE_WORDS = 200
+FACT_PLACEHOLDER = re.compile(r"\{\{([a-zA-Z0-9_.]+)\}\}")
 SDK_AVAILABLE = all(importlib.util.find_spec(name) is not None for name in ("agents", "openai", "pydantic"))
 ROLES = ("consolidator", "transit", "distributor", "terminal", "coordinator", "peripheral")
 PRIORITY_WEIGHTS = {"connectivity": .30, "exposure": .22, "seed": .18, "temporal": .15, "role": .10, "uncertainty": .05}
@@ -240,8 +242,8 @@ def _output_schema(prepared: dict):
         assigned_role: AssignedRole
         role_summary: str
         priority_summary: str
-        explanation: str
-        priority_explanation: str
+        explanation: str = Field(description="Russian human-readable evidence paragraph, 60–120 words, numerical facts as {{fact_id}} placeholders; exported to evidence.")
+        priority_explanation: str = Field(description="Russian human-readable why paragraph, 60–120 words, numerical facts as {{fact_id}} placeholders; exported to why.")
         alternative_explanation: str
         evidence_items: list[EvidenceItem] = Field(min_length=2, max_length=6)
         limitations: list[str] = Field(min_length=1, max_length=6)
@@ -274,7 +276,7 @@ def _prose(value: Any, minimum: int, maximum: int, field: str = "prose") -> str:
     return clean
 
 
-def _format_fact(fact: dict) -> str:
+def _format_value(fact: dict) -> str:
     value = fact["value"]
     if isinstance(value, bool):
         number = "да" if value else "нет"
@@ -287,14 +289,49 @@ def _format_fact(fact: dict) -> str:
         # amounts/counts readable; evidence_json retains the original precision.
         number = format(Decimal(f"{value:.6g}"), "f")
     unit = " KZT" if fact["unit"] == "KZT" else (" дн." if fact["unit"] == "days" else "")
-    return f"{fact['label']}={number}{unit}"
+    return f"{number}{unit}"
 
 
-def _short(summary: str, facts: list[dict]) -> str:
-    # Long prose lives in its own columns; the brief's original fields stay <=200.
-    numeric = "; ".join(_format_fact(fact) for fact in facts[:2])
-    prefix = numeric[:105]
-    return f"{prefix}: {summary}"[:200]
+def _format_fact(fact: dict) -> str:
+    return f"{fact['label']}={_format_value(fact)}"
+
+
+def narrative_word_count(value: str) -> int:
+    # Count final whitespace-separated words, including grouped numeric values.
+    # This conservative rule is shared with cache/export acceptance.
+    return len(value.split())
+
+
+def _narrative(value: Any, prepared: dict, field: str) -> str:
+    """Render API-authored sentences, never invent values or truncate prose."""
+    if not isinstance(value, str):
+        raise _invalid_prose(field, "string_required")
+    clean = " ".join(value.split())
+    refs = set(FACT_PLACEHOLDER.findall(clean))
+    catalog = prepared["fact_catalog"]
+    if not refs <= catalog.keys():
+        raise _invalid_prose(field, "unknown_fact_reference")
+    unnumbered = FACT_PLACEHOLDER.sub("значение", clean)
+    if "{" in unnumbered or "}" in unnumbered:
+        raise _invalid_prose(field, "invalid_fact_placeholder")
+    _prose(unnumbered, 40, 12000, field)
+    if field == "explanation":
+        metric_refs = {ref for ref in refs if ref.startswith("metric.") and _number(catalog[ref]["value"]) is not None}
+        if len(metric_refs) < 2:
+            raise _invalid_prose(field, "insufficient_fact_references")
+        caveat = "Это гипотеза о роли для проверки аналитиком, а не вывод о виновности. Выборка не отражает все денежные потоки."
+        if prepared["metrics"].get("depth") == 4 or prepared["metrics"].get("truncated_by_depth"):
+            caveat += " На границе обхода отсутствие исходящих переводов не доказывает прекращение движения средств."
+    else:
+        if not any(ref.startswith(("priority.", "priority_contribution.")) for ref in refs):
+            raise _invalid_prose(field, "insufficient_fact_references")
+        caveat = "Приоритет показывает очередность аналитической проверки, а не вероятность виновности или уверенность в роли. Ненаблюдаемые потоки могут изменить вывод."
+    rendered = FACT_PLACEHOLDER.sub(lambda match: _format_value(catalog[match[1]]), clean)
+    rendered = f"{rendered} {caveat}"
+    words = narrative_word_count(rendered)
+    if words > MAX_NARRATIVE_WORDS:
+        raise _invalid_prose(field, "word_limit_exceeded", words)
+    return rendered
 
 
 def validate_structured_output(prepared: dict, output: Any, usage: dict | None = None) -> dict:
@@ -305,8 +342,8 @@ def validate_structured_output(prepared: dict, output: Any, usage: dict | None =
     if not isinstance(output, dict) or set(output) != expected or output.get("assigned_role") != prepared["assigned_role"]:
         raise ValueError("INVALID_STRUCTURED_EXPLANATION")
     prose = {key: _prose(output.get(key), low, high, key) for key, low, high in (
-        ("role_summary", 12, 160), ("priority_summary", 12, 160), ("explanation", 40, 2400),
-        ("priority_explanation", 40, 2000), ("alternative_explanation", 30, 1400), ("analyst_next_step", 20, 700),
+        ("role_summary", 12, 160), ("priority_summary", 12, 160),
+        ("alternative_explanation", 30, 1400), ("analyst_next_step", 20, 700),
     )}
     items = output.get("evidence_items")
     if not isinstance(items, list) or not 2 <= len(items) <= 6:
@@ -360,13 +397,21 @@ def validate_structured_output(prepared: dict, output: Any, usage: dict | None =
     priority = [fact for item in evidence if item["kind"] == "priority" for fact in item["facts"] if _number(fact["value"]) is not None]
     if not support or not priority:
         raise ValueError("INSUFFICIENT_GROUNDED_EVIDENCE")
+    for field in ("explanation", "priority_explanation"):
+        prose[field] = _narrative(output.get(field), prepared, field)
+        # Keep an audit of all inline references, even if the model did not
+        # duplicate a catalog-known reference in its evidence_items array.
+        inline_refs = list(dict.fromkeys(FACT_PLACEHOLDER.findall(output[field])))
+        evidence.append({"kind": "support" if field == "explanation" else "priority",
+                         "source": field, "facts": [{"fact_id": ref, **catalog[ref]} for ref in inline_refs],
+                         "interpretation": prose[field]})
     role_block = "\n".join(f"{'; '.join(_format_fact(fact) for fact in item['facts'])}: {item['interpretation']}" for item in evidence if item["kind"] != "priority")
     priority_block = "\n".join(f"{'; '.join(_format_fact(fact) for fact in item['facts'])}: {item['interpretation']}" for item in evidence if item["kind"] == "priority")
     score_line = f"Роль: {prepared['assigned_role']}; role_score={prepared['role_score']:.5g}."
     priority_line = f"priority_score={prepared['priority_score']:.5g}; {PRIORITY_FORMULA}."
     usage = {key: int(value) for key in ("input_tokens", "output_tokens", "total_tokens") if isinstance((value := (usage or {}).get(key)), int) and not isinstance(value, bool) and value >= 0}
     structured = {"assigned_role": prepared["assigned_role"], **prose, "evidence_items": evidence, "limitations": limitations, "validation": {"known_fact_references": True, "numeric_values_server_owned": True, "role_unchanged": True, "semantic_truth_verified": False}}
-    return {"evidence": _short(prose["role_summary"], support), "why": _short(prose["priority_summary"], priority), "explanation": f"{score_line}\n{prose['explanation']}\n\n{role_block}\n\n{' '.join(required)}", "priority_explanation": f"{priority_line}\n{prose['priority_explanation']}\n\n{priority_block}\n\n{PRIORITY_SEMANTICS_CAVEAT} {BASE_CAVEAT}", "alternative_explanation": prose["alternative_explanation"], "evidence_json": json.dumps(evidence, ensure_ascii=False, separators=(",", ":")), "limitations": " ".join(limitations), "analyst_next_step": prose["analyst_next_step"], "structured": structured, "usage": usage}
+    return {"evidence": prose["explanation"], "why": prose["priority_explanation"], "explanation": f"{score_line}\n{prose['explanation']}\n\n{role_block}\n\n{' '.join(required)}", "priority_explanation": f"{priority_line}\n{prose['priority_explanation']}\n\n{priority_block}\n\n{PRIORITY_SEMANTICS_CAVEAT} {BASE_CAVEAT}", "alternative_explanation": prose["alternative_explanation"], "evidence_json": json.dumps(evidence, ensure_ascii=False, separators=(",", ":")), "limitations": " ".join(limitations), "analyst_next_step": prose["analyst_next_step"], "structured": structured, "usage": usage}
 
 
 async def _run_agent(prepared: dict, settings: AISettings) -> tuple[Any, dict]:
@@ -374,7 +419,7 @@ async def _run_agent(prepared: dict, settings: AISettings) -> tuple[Any, dict]:
     from openai import AsyncOpenAI
 
     async with AsyncOpenAI(api_key=settings.api_key, base_url="https://api.openai.com/v1", timeout=settings.timeout_seconds, max_retries=0) as client:
-        agent = Agent(name="HackAlem Structured Evidence Writer", instructions=PROMPT_PATH.read_text(encoding="utf-8"), model=OpenAIResponsesModel(model=settings.model, openai_client=client), model_settings=ModelSettings(store=False, max_tokens=2200), tools=[], output_type=_output_schema(prepared))
+        agent = Agent(name="HackAlem Structured Evidence Writer", instructions=PROMPT_PATH.read_text(encoding="utf-8"), model=OpenAIResponsesModel(model=settings.model, openai_client=client), model_settings=ModelSettings(store=False, max_tokens=3200), tools=[], output_type=_output_schema(prepared))
         result = await asyncio.wait_for(Runner.run(agent, json.dumps(prepared, ensure_ascii=False, separators=(",", ":")), run_config=RunConfig(tracing_disabled=True), max_turns=1), timeout=settings.timeout_seconds)
     actual_usage = getattr(getattr(result, "context_wrapper", None), "usage", None)
     usage = {key: getattr(actual_usage, key) for key in ("input_tokens", "output_tokens", "total_tokens") if actual_usage is not None and hasattr(actual_usage, key)}

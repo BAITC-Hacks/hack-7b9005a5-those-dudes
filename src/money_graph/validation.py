@@ -9,6 +9,7 @@ import pandas as pd
 from .clustering import adjusted_rand_index
 from .features import _fifo_match, build_graph, reciprocal_and_cycle_features
 from .scoring import ROLES
+from .contracts import CSV_COLUMNS
 
 
 def synthetic_motif_checks() -> dict[str, object]:
@@ -91,6 +92,8 @@ def validate_outputs(
     }
     mandatory_top_columns = {"rank", "gid", "role", "priority_score", "why"}
     checks = {
+        "fixed_csv_contract": all(tuple(frame.columns) == CSV_COLUMNS[name] for name, frame in
+                                  (("nodes_roles.csv", nodes_roles), ("clusters.csv", clusters), ("top_nodes.csv", top_nodes))),
         "nodes_row_count_matches_input": len(nodes_roles) == len(input_nodes),
         "nodes_unique_gid": nodes_roles["gid"].astype(str).nunique() == len(input_nodes),
         "nodes_gid_set_matches_input": set(nodes_roles["gid"].astype(str))

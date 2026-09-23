@@ -25,6 +25,7 @@ function harness({ script, search = '', responses = [], bundleReady = true, appR
   const elements = new Map();
   const get = selector => { if (!elements.has(selector)) elements.set(selector, element()); return elements.get(selector); };
   const exports = ['results.zip', 'nodes_roles.csv', 'clusters.csv', 'top_nodes.csv'].map(name => Object.assign(element(), { dataset: { export: name } }));
+  exports.push(Object.assign(element(), { dataset: { export: 'results.zip', mode: 'contest' } }));
   const calls = [];
   const scripts = [];
   const window = { location: { search, assign: value => { window.navigation = value; } }, handlers: {}, addEventListener(name, fn) { this.handlers[name] = fn; } };
@@ -53,7 +54,7 @@ test('bootstrap pins bundle, API calls, and all three CSV exports to the same ru
   assert.deepEqual(h.scripts, [`/api/datasets/${jobId}/dashboard_data.js`, '/app.js']);
   assert.equal(h.window.HACKALEM_CONTEXT.apiUrl('/api/query'), `/api/query?run=${jobId}`);
   assert.equal(h.window.HACKALEM_CONTEXT.apiUrl('/api/explain-node'), `/api/explain-node?run=${jobId}`);
-  for (const link of h.exports) assert.equal(link.href, `/api/datasets/${jobId}/exports/${link.dataset.export}`);
+  for (const link of h.exports) assert.equal(link.href, `/api/datasets/${jobId}/exports/${link.dataset.export}${link.dataset.mode === 'contest' ? '?mode=contest' : ''}`);
   assert(h.get('#dashboardLoader').classList.contains('hidden'));
 });
 
@@ -63,6 +64,14 @@ test('bootstrap rejects malformed run links before making any request', async ()
   assert.equal(h.calls.length, 0);
   assert.equal(h.scripts.length, 0);
   assert(h.get('#dashboardLoader').classList.contains('load-failed'));
+});
+
+test('old immutable datasets show a recalculation notice without auto-upload or API calls', async () => {
+  const h = harness({ script: 'bootstrap.js', search: `?run=${jobId}`, responses: [{ body: { status: 'ready', calculation_notice: 'Расчёт старой версии: загрузите файлы заново.' } }] });
+  await tick();
+  assert.match(h.get('#calculationNotice').textContent, /старой версии/);
+  assert(!h.get('#calculationNotice').classList.contains('hidden'));
+  assert.equal(h.calls.length, 1);
 });
 
 test('bootstrap keeps a failed or incomplete dataset out of the dashboard', async () => {

@@ -160,10 +160,20 @@ test('node explanations render evidence, why, limitations and JSON as escaped pl
   });
   assert(!html.includes('<img'));
   assert(!html.includes('<script>'));
-  for (const title of ['Почему назначена эта роль', 'Числовые основания', 'Почему этот приоритет', 'Сравнение с альтернативной ролью', 'Ограничения гипотезы', 'Следующий шаг аналитика', 'Структурированные основания']) assert(html.includes(title));
+  for (const title of ['Почему назначена эта роль · evidence', 'Почему этот приоритет · why', 'Сравнение с альтернативной ролью', 'Ограничения гипотезы', 'Следующий шаг аналитика', 'Структурированные основания']) assert(html.includes(title));
   assert(html.includes('&lt;script&gt;'));
   assert(html.includes('0.94'));
   assert.equal(structuredHtml(null), '');
+});
+
+test('human CSV paragraphs take precedence over technical trace and are not truncated', () => {
+  const evidence = 'Наблюдаемые факты объясняют выбранную роль. '.repeat(20);
+  const why = 'Проверка маршрутов полезна для понимания связей. '.repeat(20);
+  const html = structuredHtml({ evidence, why, explanation: 'TECHNICAL_ROLE_TRACE', priority_explanation: 'TECHNICAL_PRIORITY_TRACE' });
+  assert(html.includes(evidence));
+  assert(html.includes(why));
+  assert(!html.includes('TECHNICAL_ROLE_TRACE'));
+  assert(!html.includes('TECHNICAL_PRIORITY_TRACE'));
 });
 
 test('partial failures are not rendered as complete and malformed counts are clamped', () => {

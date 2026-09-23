@@ -29,7 +29,8 @@
     </div>
     <div class="dashboard-actions">
       <a class="button secondary new-analysis" href="/">Новый анализ</a>
-      <a id="exportAll" class="button" data-export="results.zip" aria-disabled="true" download="hackalem_results.zip" title="ZIP-архив: nodes_roles.csv, clusters.csv, top_nodes.csv">Скачать 3 CSV ↓</a>
+      <a id="exportContest" class="button" data-export="results.zip" data-mode="contest" aria-disabled="true" download="hackalem_contest.zip" title="Фиксированная схема: 6 / 6 / 5 колонок; краткие объяснения без API">Конкурсные 3 CSV ↓</a>
+      <a id="exportAll" class="button secondary" data-export="results.zip" aria-disabled="true" download="hackalem_extended.zip" title="Все признаки и готовые API-объяснения до 200 слов">Расширенные CSV / AI ↓</a>
       <details class="export-menu">
         <summary aria-label="Скачать CSV по отдельности" title="Скачать CSV по отдельности">⋯</summary>
         <div class="export-options">
@@ -81,6 +82,7 @@
 
     <main class="workspace">
       <div class="dataset-provenance"><span id="datasetLabel">Набор данных</span><span id="periodLabel">Загрузка данных…</span></div>
+      <p id="calculationNotice" class="panel hidden" role="status" aria-live="polite"></p>
       <div id="errorBanner" class="error-banner hidden" role="alert"></div>
 
       <details id="csvExplanationPanel" class="panel csv-explanations">
@@ -89,7 +91,7 @@
           <span id="csvExplanationBadge" class="csv-explanation-badge">Настроить</span>
         </summary>
         <div class="csv-explanation-body">
-          <p>Для каждого выбранного узла агент объяснит назначенную роль, основания, приоритет проверки и ограничения. Роли и оценки остаются рассчитанными по правилам. Это гипотезы, не вывод о виновности.</p>
+          <p>Для каждого выбранного узла ChatGPT через OpenAI API напишет понятные объяснения на русском: evidence — факты и причины роли, why — причины приоритета и что проверить. До 200 слов в каждом поле, без обрезки предложений. Роли и оценки остаются рассчитанными по правилам. Это гипотезы, не вывод о виновности.</p>
           <div class="csv-explanation-controls">
             <label class="control"><span>Какие узлы объяснить</span><select id="csvExplanationScope"><option value="all">Все узлы</option><option value="top">Только top_nodes.csv</option></select></label>
             <div class="csv-explanation-buttons"><button id="csvExplanationStart" class="button" type="button" disabled>Сгенерировать через API</button><button id="csvExplanationCancel" class="button secondary hidden" type="button">Остановить</button><button id="csvExplanationRefresh" class="button secondary" type="button">Обновить статус</button></div>
@@ -98,7 +100,7 @@
           <div class="csv-explanation-progress"><progress id="csvExplanationProgress" max="1" value="0" aria-label="Готовность AI-объяснений"></progress><span id="csvExplanationCounts">Готовых API-объяснений: —</span></div>
           <p id="csvExplanationStatus" role="status" aria-live="polite">Автоматическая отправка в OpenAI отключена. Генерация начнётся только после вашего подтверждения.</p>
           <p id="csvExplanationUsage" class="quiet-label"></p>
-          <p class="csv-explanation-export-note">Кнопка «Скачать 3 CSV» скачивает последнюю сохранённую версию. В nodes_roles.csv и top_nodes.csv появятся структурированные основания и объяснения; строки без готового API-ответа отмечены отдельно. clusters.csv не изменяется.</p>
+          <p class="csv-explanation-export-note">«Расширенные CSV / AI» включает готовые объяснения до 200 слов; неготовые строки отмечены отдельно. «Конкурсные 3 CSV» содержит ровно 6/6/5 колонок с краткими локальными основаниями, без API и без зависимости от фильтров экрана. clusters.csv не объясняется через API.</p>
         </div>
       </details>
 
@@ -111,7 +113,8 @@
           <div class="heading-actions">
             <label class="search-field">
               <span>Найти gid</span>
-              <input id="nodeSearch" type="search" inputmode="numeric" autocomplete="off" placeholder="Введите идентификатор">
+              <input id="nodeSearch" type="search" inputmode="numeric" autocomplete="off" placeholder="Введите идентификатор" aria-describedby="nodeSearchStatus">
+              <span id="nodeSearchStatus" role="status" aria-live="polite"></span>
             </label>
             <button id="resetNetwork" class="button secondary">Сбросить вид</button>
           </div>
@@ -371,10 +374,10 @@
           <aside class="panel ai-side-panel">
             <div class="panel-title-row"><h3>Быстрые запросы</h3><span>Локальные подсказки</span></div>
             <div id="aiSuggestions" class="suggestion-list">
-              <button data-prompt="Покажи узлы с самым высоким приоритетом и объясни компоненты score">Кого проверять первым?</button>
-              <button data-prompt="Покажи транзитные узлы с FIFO не менее 80% в пределах одного дня">Транзит за один день</button>
-              <button data-prompt="Какие depth-4 узлы имеют высокую неопределённость terminal-роли?">Цензурированные terminal</button>
-              <button data-prompt="Что происходит со связностью после удаления top-20 узлов?">Устойчивость top-20</button>
+              <button data-action='{"action":"top_candidates","limit":20}' data-prompt="Покажи узлы с самым высоким приоритетом и объясни компоненты score">Кого проверять первым?</button>
+              <button data-action='{"action":"top_candidates","role":"transit","min_fifo_1d":0.8,"limit":20}' data-prompt="Покажи транзитные узлы с FIFO не менее 80% в пределах одного дня">Транзит за один день</button>
+              <button data-action='{"action":"uncertain_nodes","limit":20}' data-prompt="Покажи узлы с неопределённостью роли или ограничением глубины обхода">Неопределённые роли</button>
+              <button data-action='{"action":"resilience_summary"}' data-prompt="Покажи сценарии удаления узлов и случайный baseline">Устойчивость сети</button>
             </div>
             <div class="ai-guardrails">
               <h3>Границы ответа</h3>

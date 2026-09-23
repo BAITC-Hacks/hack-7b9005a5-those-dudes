@@ -20,6 +20,7 @@ function harness(width = 900, height = 500) {
     arc: (x, y, radius) => drawn.push({ x, y, radius }),
   }, { get: (object, key) => object[key] ?? (() => {}) });
   const elements = new Map();
+  const opened = [];
   const $ = selector => {
     if (!elements.has(selector)) elements.set(selector, {
       style: {}, classList: { add() {}, remove() {} },
@@ -37,11 +38,12 @@ function harness(width = 900, height = 500) {
     fmtInt: String, fmtMoney: String, escapeHtml: String, shortGid: String,
     COLORS: { depth: ['a', 'b', 'c', 'd', 'e'], cluster: ['a', 'b'], role: {} },
     nodeById: new Map(D.nodes.map(node => [node.gid, node])),
+    openNode: gid => opened.push(gid),
   });
   vm.runInContext(`${renderer}\nthis.renderer = network;`, context);
   const network = context.renderer;
   network.setup();
-  return { network, drawn, $, resize(w, h) { size = { width: w, height: h }; observer(); } };
+  return { network, drawn, $, opened, resize(w, h) { size = { width: w, height: h }; observer(); } };
 }
 
 function bounds(network) {
@@ -59,6 +61,24 @@ function assertFitted(network) {
   assert(b.minY >= 45 && b.maxY <= network.height - 45, JSON.stringify(b));
   return b;
 }
+
+test('unknown gid has persistent visible feedback, closes previous card and recovers', () => {
+  const h = harness();
+  const search = h.$('#nodeSearch');
+  search.setCustomValidity = value => { search.validationMessage = value; };
+  h.network.selected = D.nodes[0];
+  search.value = '999999999999999999';
+  search.handlers.keydown({ key: 'Enter' });
+  assert.match(h.$('#nodeSearchStatus').textContent, /не найден/);
+  assert.equal(h.network.selected, null);
+  assert.equal(h.opened.length, 0);
+  search.value = D.nodes[0].gid;
+  search.handlers.input();
+  search.handlers.keydown({ key: 'Enter' });
+  assert.equal(h.$('#nodeSearchStatus').textContent, '');
+  assert.equal(search.validationMessage, '');
+  assert.deepEqual(h.opened, [D.nodes[0].gid]);
+});
 
 test('initial render spreads all nodes across the measured canvas, not a single pixel', () => {
   const { network, drawn } = harness();

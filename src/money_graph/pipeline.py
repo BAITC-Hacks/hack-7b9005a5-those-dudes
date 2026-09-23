@@ -17,6 +17,9 @@ from .io import InputData, load_inputs
 from .resilience import resilience_analysis
 from .scoring import ROLES, role_and_priority_scores
 from .validation import validate_outputs
+from .contracts import CSV_COLUMNS
+from .narration import ROLE_RU, amount, priority_why
+from .rules import decision_trace
 
 
 @dataclass(frozen=True)
@@ -84,8 +87,10 @@ def _cluster_table(
         top = subset.sort_values(["priority_score", "gid"], ascending=[False, True]).head(5)
         fifo_count = int((subset["fifo_1d"] >= 0.80).sum())
         hypothesis = (
-            f"Гипотеза для проверки: профиль={dominant_role} {dominant_count}/{len(subset)}; "
-            f"seed={int(subset['is_seed'].sum())}; internal={internal[cluster_id]:.0f} KZT; FIFO>=80%: {fifo_count}"
+            f"Гипотеза: {ROLE_RU[dominant_role]} у {dominant_count} из {len(subset)} узлов. "
+            f"Исходных узлов обхода: {int(subset['is_seed'].sum())}; внутренние переводы {amount(internal[cluster_id])}. "
+            f"У {fifo_count} узлов сопоставлено не менее 80% меньшего из входящего/исходящего объёмов в тот же или следующий день. "
+            "Выборка неполная; проверить маршруты, не делать вывод о виновности."
         )
         rows.append(
             {
@@ -184,17 +189,14 @@ def _top_nodes(features: pd.DataFrame, top_n: int) -> pd.DataFrame:
     ).head(max(20, int(top_n)))
     rows: list[dict[str, object]] = []
     for rank, (_, row) in enumerate(selected.iterrows(), start=1):
-        why = (
-            f"P={row.priority_score:.3f}: K={row.priority_connectivity:.2f}, E={row.priority_exposure:.2f}, "
-            f"S={row.priority_seed:.2f}, T={row.priority_temporal:.2f}; role={row.role}, conf={row.role_score:.2f}"
-        )
+        why = priority_why(row)
         rows.append(
             {
                 "rank": rank,
                 "gid": str(int(row.gid)),
                 "role": str(row.role),
                 "priority_score": float(row.priority_score),
-                "why": why[:200],
+                "why": why,
                 "role_score": float(row.role_score),
                 "cluster_id": int(row.cluster_id),
                 "secondary_role": str(row.secondary_role),
@@ -253,9 +255,12 @@ def run_pipeline(config: PipelineConfig) -> dict[str, object]:
     timings["resilience_and_tables_seconds"] = time.perf_counter() - checkpoint
 
     checkpoint = time.perf_counter()
-    nodes_roles.to_csv(config.output_dir / "nodes_roles.csv", index=False, encoding="utf-8-sig")
-    clusters.to_csv(config.output_dir / "clusters.csv", index=False, encoding="utf-8-sig")
-    top_nodes.to_csv(config.output_dir / "top_nodes.csv", index=False, encoding="utf-8-sig")
+    tables = {"nodes_roles.csv": nodes_roles, "clusters.csv": clusters, "top_nodes.csv": top_nodes}
+    for name, table in tables.items():
+        table.to_csv(config.output_dir / name.replace(".csv", "_extended.csv"), index=False, encoding="utf-8-sig")
+        tables[name] = table.loc[:, list(CSV_COLUMNS[name])].copy()
+        tables[name].to_csv(config.output_dir / name, index=False, encoding="utf-8-sig")
+    nodes_roles, clusters, top_nodes = (tables[name] for name in CSV_COLUMNS)
     resilience.to_csv(config.output_dir / "resilience.csv", index=False, encoding="utf-8-sig")
     export_features = features.copy()
     export_features["gid"] = export_features["gid"].astype(str)
@@ -274,6 +279,9 @@ def run_pipeline(config: PipelineConfig) -> dict[str, object]:
         ],
     }
     _write_json(config.output_dir / "thresholds.json", thresholds_payload)
+    _write_json(config.output_dir / "decision_traces.json", {
+        str(row["gid"]): decision_trace(row, scoring_metadata) for row in features.to_dict("records")
+    })
 
     validation = validate_outputs(inputs.nodes, nodes_roles, clusters, top_nodes)
     _write_json(config.output_dir / "validation_report.json", validation)
@@ -305,12 +313,16 @@ def run_pipeline(config: PipelineConfig) -> dict[str, object]:
             "numpy": np.__version__,
         },
         "outputs": [
+            "nodes_roles_extended.csv",
+            "clusters_extended.csv",
+            "top_nodes_extended.csv",
             "nodes_roles.csv",
             "clusters.csv",
             "top_nodes.csv",
             "resilience.csv",
             "features.csv",
             "thresholds.json",
+            "decision_traces.json",
             "validation_report.json",
             "run_metadata.json",
         ],

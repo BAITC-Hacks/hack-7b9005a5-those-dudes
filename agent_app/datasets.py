@@ -165,9 +165,20 @@ class DatasetManager:
                      and all((store.paths.output_dir / name).is_file() for name in EXPORT_NAMES))
         counts = {name: len(getattr(store, name)) for name in TABLE_COLUMNS} if store is not None else {}
         return {"run_id": "default", "status": "ready" if ready else "unavailable",
+                "calculation_notice": self._calculation_notice(store.paths.output_dir) if ready else "",
                 "phase": "complete" if ready else "unavailable", "counts": counts,
                 "dashboard_url": "/dashboard?run=default", "status_url": "/api/datasets/default", "exports": list(EXPORT_NAMES),
                 "message": "Исходный набор данных" if ready else "Готовый исходный набор недоступен; загрузите три файла."}
+
+    @staticmethod
+    def _calculation_notice(output: Path) -> str:
+        try:
+            metadata = json.loads((output / "thresholds.json").read_text(encoding="utf-8"))
+            if metadata.get("rules_source") == "money_graph.rules.decision_trace":
+                return ""
+        except (OSError, ValueError, TypeError):
+            pass
+        return "Этот набор рассчитан предыдущей версией. Для исправленного поиска временных циклов и новых локальных объяснений загрузите его файлы заново. Старый результат сохранён без изменений."
 
     def status(self, run_id: str) -> dict[str, Any]:
         if run_id == "default":
@@ -177,7 +188,10 @@ class DatasetManager:
             if run_id not in self._runs:
                 raise DatasetError("Набор данных не найден.", 404)
             # JSON round-trip makes the result independent of mutable nested state.
-            return json.loads(json.dumps(self._runs[run_id]))
+            result = json.loads(json.dumps(self._runs[run_id]))
+            if result.get("status") == "ready":
+                result["calculation_notice"] = self._calculation_notice(self._directory(run_id) / "output")
+            return result
 
     def submit(self, files: dict[str, bytes]) -> dict[str, Any]:
         with self._lock:
@@ -314,10 +328,34 @@ class DatasetManager:
             base = self.static_dir if filename == "dashboard_data.js" else self.default_engine.store.paths.output_dir
         else:
             base = self._directory(run_id) / ("public" if filename == "dashboard_data.js" else "output")
-        path = base / filename
+        from money_graph.contracts import extended_path
+        path = extended_path(base / filename)
         if not path.is_file() or path.resolve().parent != base.resolve():
             raise DatasetError("Файл расчёта не найден. Загрузите набор повторно.", 404)
         return path
+
+    def competition_asset(self, run_id: str, filename: str) -> Path:
+        from hashlib import sha256
+        from money_graph.contracts import competition_bytes
+        if filename not in EXPORT_NAMES:
+            raise DatasetError("Файл выгрузки не найден.", 404)
+        source = self.asset(run_id, filename)
+        payload = competition_bytes(source, filename)
+        destination = self.root / "runtime" / "competition" / run_id / sha256(payload).hexdigest()
+        destination.mkdir(parents=True, exist_ok=True)
+        path = destination / filename
+        if not path.exists():
+            temporary = destination / (filename + "." + uuid4().hex + ".tmp")
+            temporary.write_bytes(payload)
+            temporary.replace(path)
+        return path
+
+    def competition_archive(self, run_id: str) -> bytes:
+        buffer = BytesIO()
+        with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
+            for name in EXPORT_NAMES:
+                archive.write(self.competition_asset(run_id, name), arcname=name)
+        return buffer.getvalue()
 
     def archive(self, run_id: str) -> bytes:
         paths = [self.asset(run_id, name) for name in EXPORT_NAMES]

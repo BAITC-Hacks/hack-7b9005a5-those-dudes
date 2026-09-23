@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from bisect import bisect_left
+
 from collections import Counter, defaultdict
 from math import exp, log1p
 from typing import Iterable
@@ -325,23 +327,25 @@ def reciprocal_and_cycle_features(
     }
 
     def has_temporal_order(cycle: list[int]) -> bool:
-        # Try every rotation because a cycle has no intrinsic first edge.
+        # A cycle has no intrinsic first edge OR first transaction. An older
+        # unrelated transfer must not hide a later valid traversal. For a fixed
+        # start, choosing the earliest feasible next date is complete: any later
+        # choice can only shrink the remaining seven-day window.
         for start in range(len(cycle)):
             rotated = cycle[start:] + cycle[:start]
-            chosen: pd.Timestamp | None = None
-            first: pd.Timestamp | None = None
-            valid = True
-            for index, source in enumerate(rotated):
-                target = rotated[(index + 1) % len(rotated)]
-                dates = edge_dates.get((source, target), [])
-                candidate = next((date for date in dates if chosen is None or date >= chosen), None)
-                if candidate is None:
-                    valid = False
-                    break
-                first = candidate if first is None else first
-                chosen = candidate
-            if valid and first is not None and chosen is not None and (chosen - first).days <= 7:
-                return True
+            route_dates = [edge_dates.get((source, rotated[(i + 1) % len(rotated)]), [])
+                           for i, source in enumerate(rotated)]
+            for first in route_dates[0]:
+                chosen = first
+                valid = True
+                for dates in route_dates[1:]:
+                    index = bisect_left(dates, chosen)
+                    if index == len(dates) or (dates[index] - first).days > 7:
+                        valid = False
+                        break
+                    chosen = dates[index]
+                if valid:
+                    return True
         return False
 
     cycle_count: dict[int, int] = Counter()

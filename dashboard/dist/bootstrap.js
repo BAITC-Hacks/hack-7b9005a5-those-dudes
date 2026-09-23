@@ -28,10 +28,13 @@
         exportUrl: name => `${base}/exports/${encodeURIComponent(name)}`
       });
       document.querySelectorAll("[data-export]").forEach(link => {
-        link.href = window.HACKALEM_CONTEXT.exportUrl(link.dataset.export);
+        link.href = window.HACKALEM_CONTEXT.exportUrl(link.dataset.export) + (link.dataset.mode === "contest" ? "?mode=contest" : "");
         link.removeAttribute("aria-disabled");
       });
       document.querySelector("#datasetLabel").textContent = runId === "default" ? "Исходный набор" : `Загруженный набор · ${runId.slice(0, 8)}`;
+      const calculationNotice = document.querySelector("#calculationNotice");
+      calculationNotice.textContent = typeof status.calculation_notice === "string" ? status.calculation_notice : "";
+      calculationNotice.classList.toggle("hidden", !calculationNotice.textContent);
       message.textContent = "Загружаем граф, роли и проверенные результаты…";
       await loadScript(`${base}/dashboard_data.js`);
       if (!window.HACKALEM_DATA) throw new Error("Данные анализа не найдены. Вернитесь к загрузке файлов.");

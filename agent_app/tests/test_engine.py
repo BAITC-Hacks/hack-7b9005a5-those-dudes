@@ -202,6 +202,38 @@ class EngineTest(unittest.TestCase):
         result = self.engine.node_profile("999999999999999999")
         self.assertEqual(result["status"], "not_found")
 
+    def test_collection_question_uses_all_five_identifiers(self):
+        gids = [G1, G2, G3, G4, "100000000000000005"]
+        with patch.object(self.engine, "common_recipients", return_value={"action": "common_recipients"}) as collect:
+            result = self.engine.answer_offline("Кто собирает деньги с этих пятерых: " + ", ".join(gids))
+        self.assertEqual(result["action"], "common_recipients")
+        collect.assert_called_once_with(gids, 20)
+
+    def test_ambiguous_multiple_identifiers_are_not_silently_dropped(self):
+        for query in (f"Покажи {G1} и {G2}", f"Маршруты {G1} и {G2}"):
+            result = self.engine.answer_offline(query)
+            self.assertEqual(result["status"], "needs_clarification")
+            self.assertEqual(result["data"]["gids"], [G1, G2])
+
+    def test_transit_suggestion_applies_fifo_filter_not_only_role(self):
+        self.store.roles.loc[self.store.roles.gid == G3, ["role", "fifo_1d"]] = ["transit", .0453]
+        result = self.engine.answer_offline("Покажи транзитные узлы с FIFO не менее 80% в пределах одного дня")
+        structured = self.engine.execute({"action": "top_candidates", "role": "transit", "min_fifo_1d": .8})
+        self.assertEqual(result, structured)
+        self.assertEqual([row["gid"] for row in result["data"]["candidates"]], [G2])
+
+    def test_all_dashboard_suggestions_match_structured_actions(self):
+        import re
+        html = (Path(__file__).resolve().parents[2] / "dashboard" / "dist" / "index.html").read_text(encoding="utf-8")
+        suggestions = re.findall(r"data-action='([^']+)' data-prompt=\"([^\"]+)\"", html)
+        self.assertEqual(len(suggestions), 4)
+        for raw, prompt in suggestions:
+            self.assertEqual(self.engine.answer_offline(prompt), self.engine.execute(json.loads(raw)), prompt)
+
+    def test_invalid_fifo_filter_is_not_ignored(self):
+        for value in (-.1, 1.1, "bad", float("nan")):
+            self.assertEqual(self.engine.execute({"action": "top_candidates", "min_fifo_1d": value})["status"], "invalid_request")
+
     def test_sdk_mode_stops_before_api_without_key(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaisesRegex(RuntimeError, "OPENAI_API_KEY"):

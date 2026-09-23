@@ -27,8 +27,8 @@ def payload_fixture():
 def output_fixture():
     return {"assigned_role": "transit", "role_summary": "Входящие потоки сочетаются с передачей средств дальше.",
             "priority_summary": "Связность делает узел полезным для проверки маршрутов.",
-            "explanation": "Наблюдаются источники и получатели, поэтому роль транзита проходит условия допуска и имеет самый сильный профиль среди допущенных вариантов.",
-            "priority_explanation": "Связность даёт существенный вклад в приоритет проверки маршрутов; это отдельная оценка полезности проверки, а не уверенность в назначенной роли.",
+            "explanation": "Количество наблюдаемых отправителей — {{metric.in_deg}}, получателей — {{metric.out_deg}}. Наличие потоков в обоих направлениях поддерживает роль передачи средств дальше. Условия выбора транзитной роли выполнены, и её оценка сильнее допустимых альтернатив. Временной порядок переводов необходимо проверить отдельно.",
+            "priority_explanation": "Показатель связи между частями сети составляет {{priority.connectivity}}, а его взвешенный вклад — {{priority_contribution.connectivity}}. Это повышает полезность проверки маршрутов через узел: анализ связанных переводов поможет понять дальнейшее движение средств. Следует сопоставить даты поступлений и отправлений, не считая совпадение дат доказательством передачи тех же денег.",
             "alternative_explanation": "Альтернатива консолидации слабее по профильной оценке; наблюдаемые выходы требуют проверить дальнейшее движение средств.",
             "evidence_items": [
                 {"fact_ids": ["metric.in_deg", "metric.out_deg"], "interpretation": "Наличие источников и получателей поддерживает гипотезу о передаче средств дальше.", "kind": "support"},
@@ -95,13 +95,16 @@ class ValidationTest(unittest.TestCase):
         evidence = json.loads(result["evidence_json"])
         self.assertEqual(evidence[0]["facts"][0]["value"], 3)
         self.assertEqual(evidence[0]["facts"][0]["unit"], "count")
-        self.assertIn("входы=3", result["evidence"])
+        self.assertIn("отправителей — 3", result["evidence"])
         self.assertIn("выходы=2", result["explanation"])
-        self.assertIn("связность=0.7", result["why"])
-        self.assertIn("вклад «связность»=0.21", result["why"])
+        self.assertIn("составляет 0.7", result["why"])
+        self.assertIn("вклад — 0.21", result["why"])
         self.assertIn("приоритет", result["priority_explanation"])
-        self.assertLessEqual(len(result["evidence"]), 200)
-        self.assertLessEqual(len(result["why"]), 200)
+        self.assertGreater(len(result["evidence"]), 200)
+        self.assertGreater(len(result["why"]), 200)
+        self.assertLessEqual(module.narrative_word_count(result["evidence"]), 200)
+        self.assertLessEqual(module.narrative_word_count(result["why"]), 200)
+        self.assertNotIn("{{", result["evidence"] + result["why"])
         self.assertFalse(result["structured"]["validation"]["semantic_truth_verified"])
         self.assertEqual(result["usage"]["total_tokens"], 700)
 
@@ -166,7 +169,7 @@ class ValidationTest(unittest.TestCase):
         output["role_summary"] = "Источники и получатели поддерживают роль передачи средств далее, но требуют проверки временного порядка переводов."
         self.assertGreater(len(output["role_summary"]), 90)
         result = module.validate_structured_output(self.prepared, output)
-        self.assertLessEqual(len(result["evidence"]), 200)
+        self.assertLessEqual(module.narrative_word_count(result["evidence"]), 200)
         self.assertEqual(result["structured"]["role_summary"], output["role_summary"])
 
     def test_overlong_summary_reports_safe_length_diagnostic(self):
@@ -213,6 +216,60 @@ class ValidationTest(unittest.TestCase):
     def test_only_actual_nonnegative_token_usage_is_reported(self):
         result = module.validate_structured_output(self.prepared, output_fixture(), {"input_tokens": -1, "output_tokens": "123", "total_tokens": True})
         self.assertEqual(result["usage"], {})
+
+    def test_word_limit_is_checked_after_rendering_and_caveats_without_truncation(self):
+        for field, cell in (("explanation", "evidence"), ("priority_explanation", "why")):
+            output = output_fixture()
+            initial = module.validate_structured_output(self.prepared, output)[cell]
+            output[field] += " проверка" * (200 - module.narrative_word_count(initial))
+            result = module.validate_structured_output(self.prepared, output)
+            self.assertEqual(module.narrative_word_count(result[cell]), 200)
+            self.assertTrue(result[cell].endswith("."))
+            output[field] += " лишнее"
+            with self.assertRaises(ValueError) as caught:
+                module.validate_structured_output(self.prepared, output)
+            self.assertEqual(caught.exception.diagnostic, {"field": field, "rule": "word_limit_exceeded", "length": 201})
+
+    def test_unicode_whitespace_word_count(self):
+        self.assertEqual(module.narrative_word_count("Первый\u00a0второй\nтретий\tчетвёртый"), 4)
+
+    def test_unknown_and_malformed_inline_references_are_rejected(self):
+        for addition in (" {{metric.secret}}", " {metric.in_deg}", " {{metric.in_deg:999}}"):
+            output = output_fixture()
+            output["explanation"] += addition
+            with self.assertRaises(ValueError) as caught:
+                module.validate_structured_output(self.prepared, output)
+            self.assertNotIn("secret", repr(caught.exception.__dict__))
+
+    def test_known_inline_reference_is_audited_even_without_duplicate_in_items(self):
+        output = output_fixture()
+        output["explanation"] += " Наблюдаемый входящий объём — {{metric.in_kzt}}."
+        result = module.validate_structured_output(self.prepared, output)
+        inline = next(item for item in json.loads(result["evidence_json"]) if item.get("source") == "explanation")
+        self.assertTrue(any(fact["fact_id"] == "metric.in_kzt" and fact["value"] == 45000 for fact in inline["facts"]))
+
+    def test_human_cells_require_inline_facts_not_just_separate_json(self):
+        for field in ("explanation", "priority_explanation"):
+            output = output_fixture()
+            output[field] = "Общее объяснение без наблюдаемых фактов не должно считаться достаточным."
+            with self.assertRaises(ValueError) as caught:
+                module.validate_structured_output(self.prepared, output)
+            self.assertEqual(caught.exception.diagnostic["rule"], "insufficient_fact_references")
+
+    def test_human_cells_render_amounts_without_technical_labels(self):
+        output = output_fixture()
+        output["explanation"] += " Наблюдаемый входящий объём — {{metric.in_kzt}}."
+        output["evidence_items"][0]["fact_ids"].append("metric.in_kzt")
+        result = module.validate_structured_output(self.prepared, output)
+        self.assertIn("объём — 45 000 KZT", result["evidence"])
+        self.assertNotIn("metric.", result["evidence"])
+        self.assertNotIn("=", result["evidence"])
+
+    def test_depth_caveat_is_in_human_evidence_not_only_technical_details(self):
+        payload = payload_fixture()
+        payload["metrics"]["depth"] = 4
+        result = module.validate_structured_output(module.prepare_payload(payload), output_fixture())
+        self.assertIn("На границе обхода", result["evidence"])
 
 
 @unittest.skipUnless(module.SDK_AVAILABLE, "optional SDK not installed")

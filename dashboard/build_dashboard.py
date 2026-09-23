@@ -23,6 +23,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from money_graph.io import load_inputs  # noqa: E402
+from money_graph.contracts import extended_path
 
 DEFAULT_DATA = ROOT / "input_data" / "data"
 DEFAULT_DIST = Path(__file__).resolve().parent / "dist"
@@ -280,9 +281,9 @@ def build(data_dir: Path, dist_dir: Path, output_dir: Path) -> Path:
     nodes, edges, transactions = inputs.nodes, inputs.edges, inputs.transactions
 
     optional_warnings: list[str] = []
-    role_output = read_optional_csv(output_dir / "nodes_roles.csv", optional_warnings)
-    cluster_output = read_optional_csv(output_dir / "clusters.csv", optional_warnings)
-    top_output = read_optional_csv(output_dir / "top_nodes.csv", optional_warnings)
+    role_output = read_optional_csv(extended_path(output_dir / "nodes_roles.csv"), optional_warnings)
+    cluster_output = read_optional_csv(extended_path(output_dir / "clusters.csv"), optional_warnings)
+    top_output = read_optional_csv(extended_path(output_dir / "top_nodes.csv"), optional_warnings)
     resilience_output = read_optional_csv(output_dir / "resilience.csv", optional_warnings)
     features_output = read_optional_csv(output_dir / "features.csv", optional_warnings)
     thresholds_output = read_optional_json(output_dir / "thresholds.json", optional_warnings)

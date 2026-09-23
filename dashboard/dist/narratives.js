@@ -22,9 +22,8 @@
   function structuredHtml(result) {
     if (!result) return "";
     const sections = [
-      ["Почему назначена эта роль", result.explanation || result.role_explanation],
-      ["Числовые основания", result.evidence],
-      ["Почему этот приоритет", result.priority_explanation || result.why],
+      ["Почему назначена эта роль · evidence", result.evidence || result.explanation || result.role_explanation],
+      ["Почему этот приоритет · why", result.why || result.priority_explanation],
       ["Сравнение с альтернативной ролью", result.alternative_explanation],
       ["Ограничения гипотезы", result.limitations],
       ["Следующий шаг аналитика", result.analyst_next_step]

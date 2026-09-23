@@ -44,14 +44,15 @@
   },
   "cluster_metadata": {
     "method": "louvain_symmetrized_amount_medoid",
+    "primary_weight": "amount_weight",
     "direction_tradeoff": "Louvain использует симметризованную проекцию; направленные признаки сохранены отдельно",
     "n_runs": 16,
     "random_seed": 42,
     "medoid_run": 13,
     "n_clusters": 89,
-    "pairwise_ari_median": 0.9194592040421743,
+    "pairwise_ari_median": 0.9180677228993267,
     "pairwise_ari_min": 0.8029877545282348,
-    "amount_vs_count_ari": 0.4353918176713035,
+    "amount_vs_count_ari": 0.4248718602960603,
     "optional_infomap_available": false,
     "optional_leiden_available": false,
     "optional_sbm_available": false,
@@ -60,30 +61,34 @@
   "motif_metadata": {
     "n_reciprocal_pairs": 177,
     "n_cycles_length_2_6": 1541,
-    "n_temporally_ordered_cycles_7d": 187
+    "n_temporally_ordered_cycles_7d": 206
   },
   "timings": {
-    "load_and_validate_seconds": 0.07714420001138933,
-    "features_seconds": 9.843568500014953,
-    "clustering_seconds": 1.8494439999922179,
-    "roles_and_priority_seconds": 0.31135429997812025,
-    "resilience_and_tables_seconds": 2.981708899984369,
-    "write_and_validate_seconds": 0.2602086999977473,
-    "total_seconds": 15.32350349999615
+    "load_and_validate_seconds": 0.10473790002288297,
+    "features_seconds": 9.252784200012684,
+    "clustering_seconds": 1.2796649999800138,
+    "roles_and_priority_seconds": 0.22107150001102127,
+    "resilience_and_tables_seconds": 2.6053347999986727,
+    "write_and_validate_seconds": 0.9609124999842606,
+    "total_seconds": 14.424579399987124
   },
   "runtime": {
     "python": "3.12.14",
-    "pandas": "3.0.1",
-    "networkx": "3.5",
+    "pandas": "2.3.3",
+    "networkx": "3.7",
     "numpy": "2.5.3"
   },
   "outputs": [
+    "nodes_roles_extended.csv",
+    "clusters_extended.csv",
+    "top_nodes_extended.csv",
     "nodes_roles.csv",
     "clusters.csv",
     "top_nodes.csv",
     "resilience.csv",
     "features.csv",
     "thresholds.json",
+    "decision_traces.json",
     "validation_report.json",
     "run_metadata.json"
   ]

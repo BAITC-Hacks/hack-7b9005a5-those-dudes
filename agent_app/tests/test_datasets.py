@@ -67,6 +67,37 @@ class PreflightTests(unittest.TestCase):
 
 
 class DatasetManagerTests(unittest.TestCase):
+    def test_old_results_have_explicit_non_mutating_recalculation_notice(self):
+        import json
+        self.assertIn("предыдущей версией", self.manager.current()["calculation_notice"])
+        (self.output / "thresholds.json").write_text(json.dumps({"rules_source": "money_graph.rules.decision_trace"}), encoding="utf-8")
+        self.assertEqual(self.manager.current()["calculation_notice"], "")
+
+    def test_competition_zip_is_fixed_and_keeps_ids_without_api(self):
+        import csv
+        from io import StringIO
+        from money_graph.contracts import CSV_COLUMNS
+        for name, fields in CSV_COLUMNS.items():
+            row = {field: "1" for field in fields}
+            if "gid" in row:
+                row["gid"] = "100000000000000001"
+            for field in ("evidence", "why", "hypothesis"):
+                if field in row:
+                    row[field] = "Глубина 4: выход может быть скрыт."
+            with (self.output / name).open("w", encoding="utf-8-sig", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=[*fields, "extra"])
+                writer.writeheader()
+                writer.writerow({**row, "extra": "original extra"})
+        with ZipFile(BytesIO(self.manager.competition_archive("default"))) as archive:
+            self.assertEqual(set(archive.namelist()), set(CSV_COLUMNS))
+            for name, fields in CSV_COLUMNS.items():
+                reader = csv.DictReader(StringIO(archive.read(name).decode("utf-8-sig")))
+                self.assertEqual(tuple(reader.fieldnames), fields)
+                rows = list(reader)
+                if "gid" in fields:
+                    self.assertEqual(rows[0]["gid"], "100000000000000001")
+        self.assertIn(b"extra", (self.output / "nodes_roles.csv").read_bytes())
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
